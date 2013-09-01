@@ -9,8 +9,10 @@
 #include <SDL2/SDL.h>
 #endif
 
-/**
+/*
 * Small class for managing SDL, destructor will quit SDL
+* One instance of this class should be created at the start of
+* the program and not destroyed until you're done with SDL
 */
 class SDL {
 public:
@@ -24,13 +26,13 @@ public:
 	~SDL();
 };
 
-/**
+/*
 *  Window management class, provides a simple wrapper around
 *  the SDL_Window and SDL_Renderer functionalities
 */
 class Window {
 public:
-	/**
+	/*
 	* Create a new window and a corresponding gl context and make it current
 	* @param title window title
 	* @param width window width
