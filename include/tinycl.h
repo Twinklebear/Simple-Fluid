@@ -31,19 +31,16 @@ namespace tcl {
 		*/
 		cl::Program loadProgram(const std::string &file);
 		/*
-		* Select some kernel from the program
-		*/
-		cl::Kernel loadKernel(const cl::Program &prog, const std::string &kernel);
-		/*
 		* Create a buffer of some desired size and pass some data to it
 		* @param mem Type of memory we want to create
 		* @param size Size of buffer to allocate
 		* @param data The data to write to the buffer, nullptr indicates no data to write
+		* @param offset The offset in the buffer to write at
 		* @param blocking If this call should be blocking
 		* @param depends Events this operation depends on
 		* @param notify Event that this operation should notify upon completion
 		*/
-		cl::Buffer buffer(MEM mem, size_t size, void *data, bool blocking,
+		cl::Buffer buffer(MEM mem, size_t size, void *data, size_t offset, bool blocking,
 			const std::vector<cl::Event> *depends = nullptr, cl::Event *notify = nullptr);
 		/*
 		* Create a buffer to make use of an existing OpenGL buffer for data
@@ -68,11 +65,12 @@ namespace tcl {
 		* @param buf The buffer to write too
 		* @param size Size of data to write
 		* @param data The data to write
+		* @param offset Offset in the buffer to write too
 		* @param blocking If this call should be blocking
 		* @param depends Events this operation depends on
 		* @param notify Event that this operation should notify upon completion
 		*/
-		void writeData(cl::Buffer &buf, size_t size, void *data, bool blocking,
+		void writeData(cl::Buffer &buf, size_t size, void *data, size_t offset, bool blocking,
 			const std::vector<cl::Event> *depends = nullptr, cl::Event *notify = nullptr);
 		/*
 		* Read some data from the buffer into the host memory
@@ -97,7 +95,7 @@ namespace tcl {
 		* @param depends Events this operation depends on
 		* @param notify Event that this operation should notify upon completion
 		*/
-		void runKernel(cl::Kernel &kernel, cl::NDRange global, cl::NDRange local,
+		void runNDKernel(cl::Kernel &kernel, cl::NDRange global, cl::NDRange local,
 			cl::NDRange offset, bool blocking, const std::vector<cl::Event> *depends = nullptr,
 			cl::Event *notify = nullptr);
 
@@ -115,6 +113,10 @@ namespace tcl {
 		* @param profile If we want profiling info available
 		*/
 		void selectInteropDevice(DEVICE dev, bool profile);
+		/*
+		* Log an OpenCL error to stdout
+		*/
+		void logCLError(const cl::Error &e, const std::string &msg) const;
 
 	public:
 		std::vector<cl::Platform> mPlatforms;
