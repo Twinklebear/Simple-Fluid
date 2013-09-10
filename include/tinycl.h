@@ -1,6 +1,7 @@
 #ifndef TINYCL_H
 #define TINYCL_H
 
+#define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 
 namespace tcl {
