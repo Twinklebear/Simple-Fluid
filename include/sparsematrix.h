@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <ostream>
+#include <sstream>
+#include <fstream>
 #include <algorithm>
 
 /*
@@ -14,7 +16,7 @@ struct MatrixElement {
 	int row, col;
 	T val;
 
-	MatrixElement() : row(-1), col(-1), val(T{})
+	MatrixElement() : row(-1), col(-1), val(0)
 	{}
 	//Create an element
 	MatrixElement(int row, int col, T val) : row(row), col(col), val(val)
@@ -145,7 +147,7 @@ private:
 				}
 				//Otherwise it's element data in the form: row col value
 				else {
-					MatrixElement elem;
+					MatrixElement<T> elem;
 					std::stringstream ss(line);
 					ss >> elem.row >> elem.col >> elem.val;
 					//Matrix Market is 1-indexed, so subtract 1
@@ -163,9 +165,9 @@ private:
 		//Select the appropriate sorting for the way we want to treat the matrix, row-maj or col-maj
 		//If row major we'll sort by row, if column sort by col, both in ascending order
 		if (rowMaj)
-			std::sort(elements.begin(), elements.end(), rowMajor);
+			std::sort(elements.begin(), elements.end(), rowMajor<T>);
 		else
-			std::sort(elements.begin(), elements.end(), colMajor);
+			std::sort(elements.begin(), elements.end(), colMajor<T>);
 	}
 
 public:

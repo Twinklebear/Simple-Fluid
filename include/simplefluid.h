@@ -32,7 +32,7 @@ private:
 	* Generate the cell-cell interaction matrix for this simulation
 	* where diagonal entries are 4 and neighbor cells are -1
 	*/
-	SparseMatrix<int> createInteractionMatrix();
+	SparseMatrix<float> createInteractionMatrix();
 	/*
 	* Compute the cell number of a cell at the x,y coordinates
 	*/
@@ -47,7 +47,7 @@ private:
 	tcl::Context context;
 	int dim;
 	Window &window;
-	SparseMatrix<int> interactionMat;
+	SparseMatrix<float> interactionMat;
 	//The quad to be used for drawing the fluid texture
 	const static std::array<glm::vec3, 8> quad;
 	//The quad's element buffer

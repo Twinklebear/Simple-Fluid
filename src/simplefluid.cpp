@@ -32,20 +32,20 @@ void SimpleFluid::runTests(){
 void SimpleFluid::testVelocityField(){
 
 }
-SparseMatrix<int> SimpleFluid::createInteractionMatrix(){
-	std::vector<MatrixElement<int>> elems;
-	int nCells = static_cast<int>(std::pow(dim, 2));
+SparseMatrix<float> SimpleFluid::createInteractionMatrix(){
+	std::vector<MatrixElement<float>> elems;
+	int nCells = static_cast<float>(std::pow(dim, 2));
 	for (int i = 0; i < nCells; ++i){
 		//In the matrix all diagonal entires are 4 and neighbor cells are -1
-		elems.push_back(MatrixElement<int>(i, i, 4));
+		elems.push_back(MatrixElement<float>(i, i, 4));
 		int x, y;
 		cellPos(i, x, y);
-		elems.push_back(MatrixElement<int>(i, cellNumber(x - 1, y), -1));
-		elems.push_back(MatrixElement<int>(i, cellNumber(x + 1, y), -1));
-		elems.push_back(MatrixElement<int>(i, cellNumber(x, y - 1), -1));
-		elems.push_back(MatrixElement<int>(i, cellNumber(x, y + 1), -1));
+		elems.push_back(MatrixElement<float>(i, cellNumber(x - 1, y), -1));
+		elems.push_back(MatrixElement<float>(i, cellNumber(x + 1, y), -1));
+		elems.push_back(MatrixElement<float>(i, cellNumber(x, y - 1), -1));
+		elems.push_back(MatrixElement<float>(i, cellNumber(x, y + 1), -1));
 	}
-	return std::move(SparseMatrix<int>(elems, dim, true));
+	return SparseMatrix<float>(elems, dim, true);
 }
 int SimpleFluid::cellNumber(int x, int y) const {
 	//Wrap coordinates if needed, no x,y should be passed that's less than -dim - 1
