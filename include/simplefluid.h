@@ -6,6 +6,7 @@
 #include "tinycl.h"
 #include "window.h"
 #include "sparsematrix.h"
+#include "cgsolver.h"
 
 /*
 * Handles running a simple 2d MAC grid fluid simulation
@@ -48,6 +49,7 @@ private:
 	int dim;
 	Window &window;
 	SparseMatrix<float> interactionMat;
+	CGSolver cgSolver;
 	//The quad to be used for drawing the fluid texture
 	const static std::array<glm::vec3, 8> quad;
 	//The quad's element buffer
