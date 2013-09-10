@@ -33,7 +33,7 @@ cl::Program tcl::Context::loadProgram(const std::string &file){
 		throw e;
 	}
 }
-cl::Buffer tcl::Context::buffer(MEM mem, size_t size, void *data, size_t offset, bool blocking,
+cl::Buffer tcl::Context::buffer(MEM mem, size_t size, const void *data, size_t offset, bool blocking,
 	const std::vector<cl::Event> *depends, cl::Event *notify)
 {
 	try {
@@ -80,7 +80,7 @@ cl::Image2DGL tcl::Context::imageGL(MEM mem, GLuint tex){
 }
 
 #endif
-void tcl::Context::writeData(cl::Buffer &buf, size_t size, void *data, size_t offset, bool blocking,
+void tcl::Context::writeData(cl::Buffer &buf, size_t size, const void *data, size_t offset, bool blocking,
 	const std::vector<cl::Event> *depends, cl::Event *notify)
 {
 	try {

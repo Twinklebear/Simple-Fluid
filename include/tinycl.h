@@ -36,12 +36,12 @@ namespace tcl {
 		* @param mem Type of memory we want to create
 		* @param size Size of buffer to allocate
 		* @param data The data to write to the buffer, nullptr indicates no data to write
-		* @param offset The offset in the buffer to write at
-		* @param blocking If this call should be blocking
-		* @param depends Events this operation depends on
-		* @param notify Event that this operation should notify upon completion
+		* @param offset The offset in the buffer to write at, default 0
+		* @param blocking If this call should be blocking, default non-blocking
+		* @param depends Events this operation depends on, default none
+		* @param notify Event that this operation should notify upon completion, default none
 		*/
-		cl::Buffer buffer(MEM mem, size_t size, void *data, size_t offset, bool blocking,
+		cl::Buffer buffer(MEM mem, size_t size, const void *data, size_t offset = 0, bool blocking = false,
 			const std::vector<cl::Event> *depends = nullptr, cl::Event *notify = nullptr);
 		/*
 		* Create a buffer to make use of an existing OpenGL buffer for data
@@ -66,12 +66,12 @@ namespace tcl {
 		* @param buf The buffer to write too
 		* @param size Size of data to write
 		* @param data The data to write
-		* @param offset Offset in the buffer to write too
-		* @param blocking If this call should be blocking
-		* @param depends Events this operation depends on
-		* @param notify Event that this operation should notify upon completion
+		* @param offset Offset in the buffer to write too, default 0
+		* @param blocking If this call should be blocking, default non-blocking
+		* @param depends Events this operation depends on, default none
+		* @param notify Event that this operation should notify upon completion, default none
 		*/
-		void writeData(cl::Buffer &buf, size_t size, void *data, size_t offset, bool blocking,
+		void writeData(cl::Buffer &buf, size_t size, const void *data, size_t offset = 0, bool blocking = false,
 			const std::vector<cl::Event> *depends = nullptr, cl::Event *notify = nullptr);
 		/*
 		* Read some data from the buffer into the host memory
