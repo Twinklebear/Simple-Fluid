@@ -44,6 +44,9 @@ void CGSolver::solve(){
 void CGSolver::updateB(const std::vector<float> &b){
 	bVec = context.buffer(tcl::MEM::READ_ONLY, dimensions * sizeof(float), &b[0]);
 }
+void CGSolver::updateB(cl::Buffer &b){
+	bVec = b;
+}
 std::vector<float> CGSolver::getResult(){
 	std::vector<float> res;
 	res.resize(dimensions);
@@ -74,7 +77,10 @@ void CGSolver::createBuffers(const SparseMatrix<float> &mat, const std::vector<f
 	matrix[MATRIX::COL] = context.buffer(tcl::MEM::READ_ONLY, cols.size() * sizeof(int), &cols[0]);
 	matrix[MATRIX::VAL] = context.buffer(tcl::MEM::READ_ONLY, vals.size() * sizeof(float), &vals[0]);
 
-	bVec = context.buffer(tcl::MEM::READ_ONLY, dimensions * sizeof(float), &b[0]);
+	//In the case that we want to upload everything but the b vector, skip creating it
+	if (!b.empty()){
+		bVec = context.buffer(tcl::MEM::READ_ONLY, b.size() * sizeof(float), &b[0]);
+	}
 	result = context.buffer(tcl::MEM::READ_WRITE, dimensions * sizeof(float), nullptr);
 
 	//Setup the other buffers we'll need for the computation

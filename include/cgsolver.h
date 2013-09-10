@@ -18,9 +18,9 @@ public:
 	/*
 	* Give the solver the linear system to solve for x: Ax = b and the OpenCL context to
 	* use for the computation. The matrix should be square and have equal dimensionality to the b vector
+	* although an empty b vector is also valid if you want to upload everything but not solve yet
 	* You can also specify the max iteration count (default 1000) and the length
 	* to accept for convergence (default 0.01f)
-	* WARNING: The only acceptable values for T are int and float at the moment
 	*/
 	CGSolver(const SparseMatrix<float> &mat, const std::vector<float> &b, 
 		tcl::Context &context, int iter = 1000, float len = 0.01f);
@@ -29,10 +29,13 @@ public:
 	*/
 	void solve();
 	/*
-	* Load up a new b vector to solve the system for, it must still be
-	* the same dimensionality as the matrix
+	* Load up a new b vector
 	*/
 	void updateB(const std::vector<float> &b);
+	/*
+	* Pass an existing CL buffer to be used as the b vector
+	*/
+	void updateB(cl::Buffer &b);
 	/*
 	* Get the result as a vector. This will read the result vector off the device and return it
 	*/
