@@ -60,21 +60,13 @@ SparseMatrix<float> SimpleFluid::createInteractionMatrix(){
 	return SparseMatrix<float>(elems, dim, true);
 }
 int SimpleFluid::cellNumber(int x, int y) const {
-	//Wrap coordinates if needed, no x,y should be passed that's less than -dim - 1
-	//so it's ok to just do += dim for negative x,y vals
 	if (x < 0){
-		x += dim;
-	}
-	else if (x >= dim){
-		x %= dim;
+		x += dim * (std::abs(x / dim) + 1);
 	}
 	if (y < 0){
-		y += dim;
+		y += dim * (std::abs(y / dim) + 1);
 	}
-	else if (y >= dim){
-		y %= dim;
-	}
-	return (x + y * dim);
+	return x % dim + (y % dim) * dim;
 }
 void SimpleFluid::cellPos(int n, int &x, int &y) const {
 	x = n % dim;
