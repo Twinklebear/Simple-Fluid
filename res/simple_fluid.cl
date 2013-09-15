@@ -62,3 +62,22 @@ __kernel void blend_test(__global float *v_x, __global float *v_cells){
 	// +1 column b/c x velocities have an extra entry in the x axis
 	v_cells[id.x + id.y * dim.x] = blend_velocity(pos, v_x, dim.y, dim.x + 1);
 }
+/*
+* Kernel to compute the negative divergence of the velocity field at each cell
+* One kernel should be run for each cell and as a 2d work group
+* the output buffer (neg_div) should be n_cells in length and row-major
+* delta_x is assumed to be one for now
+*/
+__kernel void velocity_divergence(__global float *v_x, __global float *v_y, __global float *neg_div){
+	int2 id = (int2)(get_global_id(0), get_global_id(1));
+	int2 dim = (int2)(get_global_size(0), get_global_size(1));
+	//Find the x velocity difference
+	int low = elem_index(id.x, id.y, dim.y, dim.x + 1);
+	int hi = elem_index(id.x + 1, id.y, dim.y, dim.x + 1);
+	float divergence = v_x[hi] - v_x[low];
+	//Now for y
+	low = elem_index(id.x, id.y, dim.y + 1, dim.x);
+	hi = elem_index(id.x, id.y + 1, dim.y + 1, dim.x);
+	divergence += v_y[hi] - v_y[low];
+	neg_div[id.x + id.y * dim.x] = -divergence;
+}
