@@ -9,20 +9,19 @@ int main(int argc, char **argv){
 	//Test computation of the negative divergence of the velocity field
 	cl::Kernel velocityDivergence(program, "velocity_divergence");
 	//Velocity fields for a 2x2 MAC grid
-
+	//For these velocity fields we expect
+	//0,0: 2
+	//1,0: 0
+	//0,1: 0
+	//1,1: 4
 	float vxField[] = {
-		0, 0, 0,
-		0, 0, 0
+		1, 0, -1,
+		2, 0, -2
 	};
-	//For this vy field we expect negative divergences of:
-	//0,0: 1
-	//1,0: -1
-	//0,1: 2
-	//1,1: -2
 	float vyField[] = {
 		1, -1,
 		0, 0,
-		-2, 2
+		2, -2
 	};
 	
 	cl::Buffer vxBuf = context.buffer(tcl::MEM::READ_ONLY, 6 * sizeof(float), vxField);
