@@ -9,19 +9,20 @@ int main(int argc, char **argv){
 	//Test computation of the negative divergence of the velocity field
 	cl::Kernel velocityDivergence(program, "velocity_divergence");
 	//Velocity fields for a 2x2 MAC grid
-	//For this vx field we expect negative divergences of:
+
+	float vxField[] = {
+		0, 0, 0,
+		0, 0, 0
+	};
+	//For this vy field we expect negative divergences of:
 	//0,0: 1
 	//1,0: -1
 	//0,1: 2
 	//1,1: -2
-	float vxField[] = {
-		1, 0, 1,
-		2, 0, 2
-	};
 	float vyField[] = {
+		1, -1,
 		0, 0,
-		0, 0,
-		0, 0
+		-2, 2
 	};
 	
 	cl::Buffer vxBuf = context.buffer(tcl::MEM::READ_ONLY, 6 * sizeof(float), vxField);
@@ -38,7 +39,7 @@ int main(int argc, char **argv){
 	float result[4] = {0};
 	context.readData(negDiv, 4 * sizeof(float), result, 0, true);
 	for (int i = 0; i < 4; ++i){
-		std::cout << "Divergence at " << i % 2 << ", " << i / 2
+		std::cout << "Divergence at " << i % 2 << "," << i / 2
 			<< " = " << result[i] << "\n";
 	}
 	std::cout << std::endl;
