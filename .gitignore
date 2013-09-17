@@ -8,6 +8,7 @@ Debug/*.txt
 LPCGame/obj
 LPCGame/*.txt
 Release/
+*.swp
 
 # ignore builds
 *.exe

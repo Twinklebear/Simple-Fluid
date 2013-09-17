@@ -47,7 +47,7 @@ float blend_velocity(float2 pos, __global float *vel_grid, int n_row, int n_col)
 	return v_tot;
 }
 /*
-* Kernel to test the velocity blending by sampling the centers of cells
+* Test the velocity blending by sampling the centers of cells
 * and outputting the velocities at the cells. Work group should be 2d and have
 * dimensions equal to the fluid grid dimensions
 * and the positions will be offset for reading from the x velocity grid
@@ -63,7 +63,7 @@ __kernel void blend_test(__global float *v_x, __global float *v_cells){
 	v_cells[id.x + id.y * dim.x] = blend_velocity(pos, v_x, dim.y, dim.x + 1);
 }
 /*
-* Kernel to compute the negative divergence of the velocity field at each cell
+* Compute the negative divergence of the velocity field at each cell
 * One kernel should be run for each cell and as a 2d work group
 * the output buffer (neg_div) should be n_cells in length and row-major
 * delta_x is assumed to be one for now
@@ -80,4 +80,30 @@ __kernel void velocity_divergence(__global float *v_x, __global float *v_y, __gl
 	hi = elem_index(id.x, id.y + 1, dim.y + 1, dim.x);
 	divergence += v_y[hi] - v_y[low];
 	neg_div[id.x + id.y * dim.x] = -divergence;
+}
+/*
+* Subtract the pressure gradient off of the x velocity field
+* Kernel should be run in 2d workgroup with dimensions equal to the velocity grid dimensions
+* the cell size is assumed to be 1 (ie. delta_x = 1)
+*/
+__kernel void subtract_pressure_x(float rho, float dt, __global float *v, __global float *p){
+	int2 id = (int2)(get_global_id(0), get_global_id(1));
+	int2 dim = (int2)(get_global_size(0), get_global_size(1));
+	//Find the low and high pressure value indices
+	int low = elem_index(id.x - 1, id.y, dim.y, dim.x - 1);
+	int hi = elem_index(id.x, id.y, dim.y, dim.x - 1);
+	v[id.x + id.y * dim.x] -= (dt / rho) * (p[hi] - p[low]);
+}
+/*
+* Subtract the pressure gradient off of the y velocity field
+* Kernel should be run in a 2d workgroup with dimensions equal to the velocity grid dimensions
+* the cell size is assumed to be 1 (ie. delta_x = 1)
+*/
+__kernel void subtract_pressure_y(float rho, float dt, __global float *v, __global float *p){
+	int2 id = (int2)(get_global_id(0), get_global_id(1));
+	int2 dim = (int2)(get_global_size(0), get_global_size(1));
+	//Find the low and high pressure value indices
+	int low = elem_index(id.x, id.y - 1, dim.y - 1, dim.x);
+	int hi = elem_index(id.x, id.y, dim.y - 1, dim.x);
+	v[id.x + id.y * dim.x] -= (dt / rho) * (p[hi] - p[low]);
 }
