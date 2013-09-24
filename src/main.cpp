@@ -3,7 +3,18 @@
 #include "simplefluid.h"
 #include "tinycl.h"
 
+//Test the velocity divergence kernel
+void testVelocityDivergence();
+//Test the pressure subtraction to update the velocity field
+void testSubtractPressureX();
+void testSubtractPressureY();
+
 int main(int argc, char **argv){
+	testSubtractPressureX();
+
+    return 0;
+}
+void testVelocityDivergence(){
 	tcl::Context context(tcl::DEVICE::GPU, false, false);
 	cl::Program program = context.loadProgram("../res/simple_fluid.cl");
 	//Test computation of the negative divergence of the velocity field
@@ -42,6 +53,42 @@ int main(int argc, char **argv){
 			<< " = " << result[i] << "\n";
 	}
 	std::cout << std::endl;
+}
+void testSubtractPressureX(){
+	tcl::Context context(tcl::DEVICE::GPU, false, false);
+	cl::Program program = context.loadProgram("../res/simple_fluid.cl");
+	cl::Kernel subPressX(program, "subtract_pressure_x");
 
-    return 0;
+	float vxField[] = {
+		0, 0, 0,
+		0, 0, 0
+	};
+	float pressure[] = {
+		1, 0,
+		2, 0
+	};
+	//Just use 1 to make it easier to test
+	float rho = 1.f, dt = 1.f;
+
+	cl::Buffer vxBuff = context.buffer(tcl::MEM::READ_WRITE, 6 * sizeof(float), vxField);
+	cl::Buffer pressBuff = context.buffer(tcl::MEM::READ_ONLY, 4 * sizeof(float), pressure);
+
+	subPressX.setArg(0, rho);
+	subPressX.setArg(1, dt);
+	subPressX.setArg(2, vxBuff);
+	subPressX.setArg(3, pressBuff);
+
+	context.runNDKernel(subPressX, cl::NDRange(3, 2), cl::NullRange, cl::NullRange, false);
+	context.readData(vxBuff, 6 * sizeof(float), vxField, 0, true);
+	std::cout << "New velocity_x field:\n";
+	for (int i = 0; i < 6; ++i){
+		if (i != 0 && i % 3 == 0){
+			std::cout << "\n";
+		}
+		std::cout << vxField[i] << " ";
+	}
+	std::cout << std::endl;
+}
+void testSubtractPressureY(){
+
 }
