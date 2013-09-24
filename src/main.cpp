@@ -11,6 +11,7 @@ void testSubtractPressureY();
 
 int main(int argc, char **argv){
 	testSubtractPressureX();
+	testSubtractPressureY();
 
     return 0;
 }
@@ -90,5 +91,38 @@ void testSubtractPressureX(){
 	std::cout << std::endl;
 }
 void testSubtractPressureY(){
+	tcl::Context context(tcl::DEVICE::GPU, false, false);
+	cl::Program program = context.loadProgram("../res/simple_fluid.cl");
+	cl::Kernel subPressX(program, "subtract_pressure_y");
 
+	float vxField[] = {
+		0, 0,
+		0, 0,
+		0, 0
+	};
+	float pressure[] = {
+		1, 2,
+		0, 0
+	};
+	//Just use 1 to make it easier to test
+	float rho = 1.f, dt = 1.f;
+
+	cl::Buffer vxBuff = context.buffer(tcl::MEM::READ_WRITE, 6 * sizeof(float), vxField);
+	cl::Buffer pressBuff = context.buffer(tcl::MEM::READ_ONLY, 4 * sizeof(float), pressure);
+
+	subPressX.setArg(0, rho);
+	subPressX.setArg(1, dt);
+	subPressX.setArg(2, vxBuff);
+	subPressX.setArg(3, pressBuff);
+
+	context.runNDKernel(subPressX, cl::NDRange(2, 3), cl::NullRange, cl::NullRange, false);
+	context.readData(vxBuff, 6 * sizeof(float), vxField, 0, true);
+	std::cout << "New velocity_x field:\n";
+	for (int i = 0; i < 6; ++i){
+		if (i != 0 && i % 2 == 0){
+			std::cout << "\n";
+		}
+		std::cout << vxField[i] << " ";
+	}
+	std::cout << std::endl;
 }
