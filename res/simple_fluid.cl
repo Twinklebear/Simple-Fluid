@@ -47,22 +47,6 @@ float blend_velocity(float2 pos, __global float *vel_grid, int n_row, int n_col)
 	return v_tot;
 }
 /*
-* Test the velocity blending by sampling the centers of cells
-* and outputting the velocities at the cells. Work group should be 2d and have
-* dimensions equal to the fluid grid dimensions
-* and the positions will be offset for reading from the x velocity grid
-* grid_dim is the dimensionality of the square fluid grid
-* Y velocities should be the same equation but just offsetting on the y axis
-* and incrementing the y dimension instead of x
-*/
-__kernel void blend_test(__global float *v_x, __global float *v_cells){
-	int2 id = (int2)(get_global_id(0), get_global_id(1));
-	float2 pos = (float2)(id.x + 0.5f, id.y);
-	int2 dim = (int2)(get_global_size(0), get_global_size(1));
-	// +1 column b/c x velocities have an extra entry in the x axis
-	v_cells[id.x + id.y * dim.x] = blend_velocity(pos, v_x, dim.y, dim.x + 1);
-}
-/*
 * Compute the negative divergence of the velocity field at each cell
 * One kernel should be run for each cell and as a 2d work group
 * the output buffer (neg_div) should be n_cells in length and row-major
@@ -107,3 +91,23 @@ __kernel void subtract_pressure_y(float rho, float dt, __global float *v, __glob
 	int hi = elem_index(id.x, id.y, dim.y - 1, dim.x);
 	v[id.x + id.y * dim.x] -= (dt / rho) * (p[hi] - p[low]);
 }
+//TODO: Write image and field advection kernels
+/*
+* Advect some MAC grid property using the x and y velocity fields over the desired timestep,
+* kernel should be run with dimensions equal to those of the MAC grid
+* The 
+*/
+__kernel void advect_field(float dt, __global float *in, __global float *out, 
+	__global float *v_x, __global float *v_y)
+{
+	int2 id = (int2)(get_global_id(0), get_global_id(1));
+	int2 dim = (int2)(get_global_size(0), get_global_size(1));
+	float2 x_pos = (float2)(id.x + 0.5f, id.y);
+	float2 y_pos = (float2)(id.x, id.y + 0.5f);
+	//Find the velocity at this point and step back a half time step
+	float2 vel = (float2)(blend_velocity(x_pos, v_x, dim.y, dim.x + 1),
+		blend_velocity(y_pos, v_y, dim.y + 1, dim.x));
+	//For testing just write the blended velocity at this point, change to test each dim
+	out[id.x + id.y * dim.x] = vel.x;
+}
+

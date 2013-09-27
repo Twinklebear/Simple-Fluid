@@ -8,10 +8,11 @@ void testVelocityDivergence();
 //Test the pressure subtraction to update the velocity field
 void testSubtractPressureX();
 void testSubtractPressureY();
+//Test the field advection kernel
+void testFieldAdvect();
 
 int main(int argc, char **argv){
-	testSubtractPressureX();
-	testSubtractPressureY();
+	testFieldAdvect();
 
     return 0;
 }
@@ -95,7 +96,7 @@ void testSubtractPressureY(){
 	cl::Program program = context.loadProgram("../res/simple_fluid.cl");
 	cl::Kernel subPressX(program, "subtract_pressure_y");
 
-	float vxField[] = {
+	float vyField[] = {
 		0, 0,
 		0, 0,
 		0, 0
@@ -107,7 +108,7 @@ void testSubtractPressureY(){
 	//Just use 1 to make it easier to test
 	float rho = 1.f, dt = 1.f;
 
-	cl::Buffer vxBuff = context.buffer(tcl::MEM::READ_WRITE, 6 * sizeof(float), vxField);
+	cl::Buffer vxBuff = context.buffer(tcl::MEM::READ_WRITE, 6 * sizeof(float), vyField);
 	cl::Buffer pressBuff = context.buffer(tcl::MEM::READ_ONLY, 4 * sizeof(float), pressure);
 
 	subPressX.setArg(0, rho);
@@ -116,13 +117,57 @@ void testSubtractPressureY(){
 	subPressX.setArg(3, pressBuff);
 
 	context.runNDKernel(subPressX, cl::NDRange(2, 3), cl::NullRange, cl::NullRange, false);
-	context.readData(vxBuff, 6 * sizeof(float), vxField, 0, true);
+	context.readData(vxBuff, 6 * sizeof(float), vyField, 0, true);
 	std::cout << "New velocity_x field:\n";
 	for (int i = 0; i < 6; ++i){
 		if (i != 0 && i % 2 == 0){
 			std::cout << "\n";
 		}
-		std::cout << vxField[i] << " ";
+		std::cout << vyField[i] << " ";
+	}
+	std::cout << std::endl;
+}
+void testFieldAdvect(){
+	tcl::Context context(tcl::DEVICE::GPU, false, false);
+	cl::Program program = context.loadProgram("../res/simple_fluid.cl");
+	cl::Kernel advectField(program, "advect_field");
+
+	//The MAC grid 'values'
+	float grid[] = {
+		0, 0,
+		0, 0
+	};
+	//The velocity fields
+	float vX[] = {
+		1, 0, -1,
+		2, 0, -2
+	};
+	float vY[] = {
+		1, -1,
+		0, 0,
+		2, -2
+	};
+	float dt = 1.f;
+
+	cl::Buffer gridA = context.buffer(tcl::MEM::READ_WRITE, 4 * sizeof(float), grid);
+	cl::Buffer gridB = context.buffer(tcl::MEM::READ_WRITE, 4 * sizeof(float), nullptr);
+	cl::Buffer vXBuf = context.buffer(tcl::MEM::READ_ONLY, 6 * sizeof(float), vX);
+	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, 6 * sizeof(float), vY);
+
+	advectField.setArg(0, dt);
+	advectField.setArg(1, gridA);
+	advectField.setArg(2, gridB);
+	advectField.setArg(3, vXBuf);
+	advectField.setArg(4, vYBuf);
+
+	context.runNDKernel(advectField, cl::NDRange(2, 2), cl::NullRange, cl::NullRange, false);
+
+	context.readData(gridB, 4 * sizeof(float), grid, 0, true);
+	for (int i = 0; i < 4; ++i){
+		if (i != 0 && i % 2 == 0){
+			std::cout << "\n";
+		}
+		std::cout << grid[i] << "  ";
 	}
 	std::cout << std::endl;
 }
