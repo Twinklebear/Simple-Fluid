@@ -184,9 +184,9 @@ void testVXFieldAdvect(){
 		4, 5, 6
 	};
 	float vY[] = {
-		1, -1, 
+		1, 0,
 		0, 0,
-		2, -2
+		0, 0
 	};
 	float dt = 1.f;
 

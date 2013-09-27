@@ -26,6 +26,9 @@ int2 grid_pos(int i, int row_len){
 /*
 * Compute the blend weight for the values at point b being interpolated to point a
 * this function relies on our grid cells being of uniform size (1x1 in this case)
+* I'm starting to feel like this is wrong, see the wikipedia bilinear interpolation page
+* should do more tests in vel_test.c and try to write the interpolation as they show it
+* for the unit square
 */
 float blend_weight(float2 a, float2 b){
 	float2 weight = (float2)(1.f - fabs(min(a.x - b.x, 1.f)),
@@ -117,11 +120,11 @@ __kernel void advect_vx(float dt, __global float *v_x, __global float *v_x_out, 
 	int2 id = (int2)(get_global_id(0), get_global_id(1));
 	int2 dim = (int2)(get_global_size(0), get_global_size(1));
 	float2 x_pos = (float2)(id.x, id.y);
-	float2 y_pos = (float2)(id.x, id.y + 0.5f);
+	float2 y_pos = (float2)(id.x - 0.5f, id.y + 0.5f);
 	float2 vel = (float2)(blend_velocity(x_pos, v_x, dim.y, dim.x),
 		blend_velocity(y_pos, v_y, dim.y + 1, dim.x - 1));
 	//Sanity check: printing out the x velocity for the x velocity cells should give
 	//the same values as the input
-	v_x_out[id.x + id.y * dim.x] = vel.x;
+	v_x_out[id.x + id.y * dim.x] = vel.y;
 }
 
