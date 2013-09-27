@@ -28,7 +28,8 @@ int2 grid_pos(int i, int row_len){
 * this function relies on our grid cells being of uniform size (1x1 in this case)
 */
 float blend_weight(float2 a, float2 b){
-	float2 weight = (float2)(1 - fabs(a.x - b.x), 1 - fabs(a.y - b.y));
+	float2 weight = (float2)(1.f - fabs(min(a.x - b.x, 1.f)),
+		1.f - fabs(min(a.y - b.y, 1.f)));
 	return weight.x * weight.y;
 }
 /*
@@ -91,11 +92,9 @@ __kernel void subtract_pressure_y(float rho, float dt, __global float *v, __glob
 	int hi = elem_index(id.x, id.y, dim.y - 1, dim.x);
 	v[id.x + id.y * dim.x] -= (dt / rho) * (p[hi] - p[low]);
 }
-//TODO: Write image and field advection kernels
 /*
-* Advect some MAC grid property using the x and y velocity fields over the desired timestep,
-* kernel should be run with dimensions equal to those of the MAC grid
-* The 
+* Advect some MAC grid property using the x and y velocity fields over the timestep
+* The kernel should be run with dimensions equal to those of the MAC grid
 */
 __kernel void advect_field(float dt, __global float *in, __global float *out, 
 	__global float *v_x, __global float *v_y)
@@ -109,5 +108,20 @@ __kernel void advect_field(float dt, __global float *in, __global float *out,
 		blend_velocity(y_pos, v_y, dim.y + 1, dim.x));
 	//For testing just write the blended velocity at this point, change to test each dim
 	out[id.x + id.y * dim.x] = vel.x;
+}
+/*
+* Advect the MAC grid's x velocity field over the timestep, kernel should be run
+* with dimensions equal to the x velocity field dimensions
+*/
+__kernel void advect_vx(float dt, __global float *v_x, __global float *v_x_out, __global float *v_y){
+	int2 id = (int2)(get_global_id(0), get_global_id(1));
+	int2 dim = (int2)(get_global_size(0), get_global_size(1));
+	float2 x_pos = (float2)(id.x, id.y);
+	float2 y_pos = (float2)(id.x, id.y + 0.5f);
+	float2 vel = (float2)(blend_velocity(x_pos, v_x, dim.y, dim.x),
+		blend_velocity(y_pos, v_y, dim.y + 1, dim.x - 1));
+	//Sanity check: printing out the x velocity for the x velocity cells should give
+	//the same values as the input
+	v_x_out[id.x + id.y * dim.x] = vel.x;
 }
 
