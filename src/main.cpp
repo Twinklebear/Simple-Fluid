@@ -135,27 +135,34 @@ void testFieldAdvect(){
 	cl::Program program = context.loadProgram("../res/simple_fluid.cl");
 	cl::Kernel advectField(program, "advect_field");
 
+	int dim = 4;
 	//The MAC grid 'values'
 	float grid[] = {
-		0, 0,
-		0, 0
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
 	};
 	//The velocity fields
 	float vX[] = {
-		1, 0, -1,
-		2, 0, -2
+		1, 0, 2, 0, 0,
+		0, 0, 0, 1, 0,
+		0, 0, 0, 0, 1,
+		1, 0, 0, 0, 0
 	};
 	float vY[] = {
-		1, -1,
-		0, 0,
-		2, -2
+		1, 0, 2, 0,
+		0, 0, 0, 1,
+		0, 0, 0, 0,
+		1, 0, 0, 0,
+		0, 0, 0, 0
 	};
 	float dt = 1.f;
 
-	cl::Buffer gridA = context.buffer(tcl::MEM::READ_WRITE, 4 * sizeof(float), grid);
-	cl::Buffer gridB = context.buffer(tcl::MEM::READ_WRITE, 4 * sizeof(float), nullptr);
-	cl::Buffer vXBuf = context.buffer(tcl::MEM::READ_ONLY, 6 * sizeof(float), vX);
-	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, 6 * sizeof(float), vY);
+	cl::Buffer gridA = context.buffer(tcl::MEM::READ_WRITE, dim * dim * sizeof(float), grid);
+	cl::Buffer gridB = context.buffer(tcl::MEM::READ_WRITE, dim * dim * sizeof(float), nullptr);
+	cl::Buffer vXBuf = context.buffer(tcl::MEM::READ_ONLY, dim * (dim + 1) * sizeof(float), vX);
+	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, dim * (dim + 1) * sizeof(float), vY);
 
 	advectField.setArg(0, dt);
 	advectField.setArg(1, gridA);
@@ -163,14 +170,14 @@ void testFieldAdvect(){
 	advectField.setArg(3, vXBuf);
 	advectField.setArg(4, vYBuf);
 
-	context.runNDKernel(advectField, cl::NDRange(2, 2), cl::NullRange, cl::NullRange, false);
+	context.runNDKernel(advectField, cl::NDRange(dim, dim), cl::NullRange, cl::NullRange, false);
 
-	context.readData(gridB, 4 * sizeof(float), grid, 0, true);
-	for (int i = 0; i < 4; ++i){
-		if (i != 0 && i % 2 == 0){
+	context.readData(gridB, dim * dim * sizeof(float), grid, 0, true);
+	for (int i = 0; i < dim * dim; ++i){
+		if (i != 0 && i % dim == 0){
 			std::cout << "\n";
 		}
-		std::cout << grid[i] << " ";
+		std::cout << std::setw(5) << grid[i] << " ";
 	}
 	std::cout << std::endl;
 }
@@ -179,34 +186,39 @@ void testVXFieldAdvect(){
 	cl::Program program = context.loadProgram("../res/simple_fluid.cl");
 	cl::Kernel advectField(program, "advect_vx");
 
+	int dim = 4;
 	float vX[] = {
-		1, 2, 3,
-		4, 5, 6
+		1, 0, 2, 0, 0,
+		0, 0, 0, 1, 0,
+		0, 0, 0, 0, 1,
+		1, 0, 0, 0, 0
 	};
 	float vY[] = {
-		1, 0,
-		0, 0,
-		0, 0
+		1, 0, 2, 0,
+		0, 0, 0, 1,
+		0, 0, 0, 0,
+		1, 0, 0, 0,
+		0, 0, 0, 0
 	};
 	float dt = 1.f;
 
-	cl::Buffer vxA = context.buffer(tcl::MEM::READ_WRITE, 6 * sizeof(float), vX);
-	cl::Buffer vxB = context.buffer(tcl::MEM::READ_WRITE, 6 * sizeof(float), nullptr);
-	cl::Buffer vyBuf = context.buffer(tcl::MEM::READ_ONLY, 6 * sizeof(float), vY);
+	cl::Buffer vxA = context.buffer(tcl::MEM::READ_WRITE, dim * (dim + 1) * sizeof(float), vX);
+	cl::Buffer vxB = context.buffer(tcl::MEM::READ_WRITE, dim * (dim + 1) * sizeof(float), nullptr);
+	cl::Buffer vyBuf = context.buffer(tcl::MEM::READ_ONLY, dim * (dim + 1) * sizeof(float), vY);
 
 	advectField.setArg(0, dt);
 	advectField.setArg(1, vxA);
 	advectField.setArg(2, vxB);
 	advectField.setArg(3, vyBuf);
 
-	context.runNDKernel(advectField, cl::NDRange(3, 2), cl::NullRange, cl::NullRange, false);
+	context.runNDKernel(advectField, cl::NDRange(dim + 1, dim), cl::NullRange, cl::NullRange, false);
 
-	context.readData(vxB, 6 * sizeof(float), vX, 0, false);
-	for (int i = 0; i < 6; ++i){
-		if (i != 0 && i % 3 == 0){
+	context.readData(vxB, dim * (dim + 1) * sizeof(float), vX, 0, false);
+	for (int i = 0; i < dim * (dim + 1); ++i){
+		if (i != 0 && i % (dim + 1) == 0){
 			std::cout << "\n";
 		}
-		std::cout << vX[i] << " ";
+		std::cout << std::setw(5) << vX[i] << " ";
 	}
 	std::cout << std::endl;
 }
