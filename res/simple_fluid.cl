@@ -35,12 +35,35 @@ float bilinear_interpolate(float2 pos, __global float *field, int n_row, int n_c
 		vals[i].w = elem_index(pos.x + i % 2, pos.y + i / 2, n_row, n_col);
 		vals[i].xy = grid_pos(vals[i].w, n_col);
 	}
-	//Translate position into the unit square we're blending in
-	pos = fabs(pos);
-	//Why does doing this with vector math not work right? ie with
-	//pos -= (int2)(pos.x, pos.y) or pos -= convert_int2(pos) both give strange results
-	pos.x -= (int)pos.x;
-	pos.y -= (int)pos.y;
+	//Translate position into a unit square to make the blending calculation easier and also handle wrapping
+	//*_range.x is the min value, *_range.y is the max value
+	float2 x_range, y_range;
+	if (pos.x < 0){
+		x_range.x = -1.f;
+		x_range.y = 0.f;
+	}
+	else if (pos.x > n_col - 1){
+		x_range.x = n_col - 1;
+		x_range.y = n_col;
+	}
+	else {
+		x_range.x = vals[0].x;
+		x_range.y = vals[1].x;
+	}
+	if (pos.y < 0){
+		y_range.x = -1.f;
+		y_range.y = 0.f;
+	}
+	else if (pos.y > n_row - 1){
+		y_range.x = n_row - 1;
+		y_range.y = n_row;
+	}
+	else {
+		y_range.x = vals[0].y;
+		y_range.y = vals[2].y;
+	}
+	pos.x = ((pos.x - x_range.x) / (x_range.y - x_range.x));
+	pos.y = ((pos.y - y_range.x) / (y_range.y - y_range.x));
 	return field[vals[0].w] * (1 - pos.x) * (1 - pos.y) + field[vals[1].w] * pos.x * (1 - pos.y)
 		+ field[vals[2].w] * (1 - pos.x) * pos.y + field[vals[3].w] * pos.x * pos.y;
 }
