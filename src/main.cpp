@@ -12,10 +12,13 @@ void testSubtractPressureY();
 void testFieldAdvect();
 //Test the x velocity field advection kernel
 void testVXFieldAdvect();
+//Test the y velocity field advection kernel
+void testVYFieldAdvect();
 
 int main(int argc, char **argv){
 	testFieldAdvect();
 	testVXFieldAdvect();
+	testVYFieldAdvect();
 
     return 0;
 }
@@ -219,6 +222,47 @@ void testVXFieldAdvect(){
 			std::cout << "\n";
 		}
 		std::cout << std::setw(6) << std::setprecision(3) << vX[i] << " ";
+	}
+	std::cout << std::endl;
+}
+void testVYFieldAdvect(){
+	tcl::Context context(tcl::DEVICE::GPU, false, false);
+	cl::Program program = context.loadProgram("../res/simple_fluid.cl");
+	cl::Kernel advectField(program, "advect_vy");
+
+	int dim = 4;
+	float vX[] = {
+		1, 1, 0, 0, 0,
+		1, 0, 0, 0, 1,
+		0, 0, 0, 0, 2,
+		0, 0, 5, 4, 3
+	};
+	float vY[] = {
+		1, 1, 0, 0,
+		1, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0
+	};
+	float dt = 1.f;
+
+	cl::Buffer vyA = context.buffer(tcl::MEM::READ_WRITE, dim * (dim + 1) * sizeof(float), vY);
+	cl::Buffer vyB = context.buffer(tcl::MEM::READ_WRITE, dim * (dim + 1) * sizeof(float), nullptr);
+	cl::Buffer vxBuf = context.buffer(tcl::MEM::READ_ONLY, dim * (dim + 1) * sizeof(float), vX);
+
+	advectField.setArg(0, dt);
+	advectField.setArg(1, vyA);
+	advectField.setArg(2, vyB);
+	advectField.setArg(3, vxBuf);
+
+	context.runNDKernel(advectField, cl::NDRange(dim, dim + 1), cl::NullRange, cl::NullRange, false);
+
+	context.readData(vyB, dim * (dim + 1) * sizeof(float), vY, 0, false);
+	for (int i = 0; i < dim * (dim + 1); ++i){
+		if (i != 0 && i % dim == 0){
+			std::cout << "\n";
+		}
+		std::cout << std::setw(6) << std::setprecision(3) << vY[i] << " ";
 	}
 	std::cout << std::endl;
 }

@@ -184,4 +184,25 @@ __kernel void advect_vx(float dt, __global float *v_x, __global float *v_x_out, 
 	//Sample the field at this pos and write it out as our new value for the location
 	v_x_out[id.x + id.y * dim.x] = bilinear_interpolate(pos, v_x, dim.y, dim.x);
 }
+/*
+* Advect a MAC grid's y velocity field over the timestep, kernel should be run
+* with dimensions equal to the y velocity field dimensions
+*/
+__kernel void advect_vy(float dt, __global float *v_y, __global float *v_y_out, __global float *v_x){
+	int2 id = (int2)(get_global_id(0), get_global_id(1));
+	int2 dim = (int2)(get_global_size(0), get_global_size(1));
+	float2 pos = (float2)(id.x, id.y);
+	float2 x_pos = (float2)(pos.x + 0.5f, pos.y - 0.5f);
+	float2 vel = (float2)(bilinear_interpolate(x_pos, v_x, dim.y - 1, dim.x + 1),
+		bilinear_interpolate(pos, v_y, dim.y, dim.x));
+
+	//Take a half step and find the velocity for the next step
+	pos -= 0.5f * dt * vel;
+	x_pos = (float2)(pos.x + 0.5f, pos.y - 0.5f);
+	vel = (float2)(bilinear_interpolate(x_pos, v_x, dim.y - 1, dim.x + 1),
+		bilinear_interpolate(pos, v_y, dim.y, dim.x));
+	pos -= dt * vel;
+	//Sample the field at this pos and write it out as our new value for the location
+	v_y_out[id.x + id.y * dim.x] = bilinear_interpolate(pos, v_y, dim.y, dim.x);
+}
 
