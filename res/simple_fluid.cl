@@ -182,8 +182,6 @@ __kernel void advect_vx(float dt, __global float *v_x, __global float *v_x_out, 
 		bilinear_interpolate(y_pos, v_y, dim.y + 1, dim.x - 1));
 	pos -= dt * vel;
 	//Sample the field at this pos and write it out as our new value for the location
-	//v_x_out[id.x + id.y * dim.x] = bilinear_interpolate(pos, v_x, dim.y, dim.x);
-	//For testing write the top-left corner of the v_x sampling square out
-	v_x_out[id.x + id.y * dim.x] = elem_index(pos.x, pos.y, dim.y, dim.x);
+	v_x_out[id.x + id.y * dim.x] = bilinear_interpolate(pos, v_x, dim.y, dim.x);
 }
 
