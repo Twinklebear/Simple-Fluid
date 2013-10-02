@@ -170,12 +170,20 @@ __kernel void advect_field(float dt, __global float *in, __global float *out,
 __kernel void advect_vx(float dt, __global float *v_x, __global float *v_x_out, __global float *v_y){
 	int2 id = (int2)(get_global_id(0), get_global_id(1));
 	int2 dim = (int2)(get_global_size(0), get_global_size(1));
-	float2 x_pos = (float2)(id.x, id.y);
-	float2 y_pos = (float2)(id.x - 0.5f, id.y + 0.5f);
-	float2 vel = (float2)(bilinear_interpolate(x_pos, v_x, dim.y, dim.x),
+	float2 pos = (float2)(id.x, id.y);
+	float2 y_pos = (float2)(pos.x - 0.5f, pos.y + 0.5f);
+	float2 vel = (float2)(bilinear_interpolate(pos, v_x, dim.y, dim.x),
 		bilinear_interpolate(y_pos, v_y, dim.y + 1, dim.x - 1));
-	//Sanity check: printing out the x velocity for the x velocity cells should give
-	//the same values as the input
-	v_x_out[id.x + id.y * dim.x] = vel.y;
+
+	//Take a half step and find the velocity for the next step
+	pos -= 0.5f * dt * vel;
+	y_pos = (float2)(pos.x - 0.5f, pos.y + 0.5f);
+	vel = (float2)(bilinear_interpolate(pos, v_x, dim.y, dim.x),
+		bilinear_interpolate(y_pos, v_y, dim.y + 1, dim.x - 1));
+	pos -= dt * vel;
+	//Sample the field at this pos and write it out as our new value for the location
+	//v_x_out[id.x + id.y * dim.x] = bilinear_interpolate(pos, v_x, dim.y, dim.x);
+	//For testing write the top-left corner of the v_x sampling square out
+	v_x_out[id.x + id.y * dim.x] = elem_index(pos.x, pos.y, dim.y, dim.x);
 }
 

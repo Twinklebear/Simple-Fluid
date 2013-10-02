@@ -188,16 +188,16 @@ void testVXFieldAdvect(){
 
 	int dim = 4;
 	float vX[] = {
-		1, 0, 2, 0, 0,
-		0, 0, 0, 1, 0,
-		0, 0, 0, 0, 1,
-		1, 0, 0, 0, 0
+		1, 1, 0, 0, 0,
+		1, 0, 0, 0, 1,
+		0, 0, 0, 0, 2,
+		0, 0, 5, 4, 3
 	};
 	float vY[] = {
-		1, 0, 2, 0,
-		0, 0, 0, 1,
-		0, 0, 0, 0,
+		1, 1, 0, 0,
 		1, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
 		0, 0, 0, 0
 	};
 	float dt = 1.f;
@@ -218,7 +218,7 @@ void testVXFieldAdvect(){
 		if (i != 0 && i % (dim + 1) == 0){
 			std::cout << "\n";
 		}
-		std::cout << std::setw(5) << vX[i] << " ";
+		std::cout << std::setw(6) << std::setprecision(3) << vX[i] << " ";
 	}
 	std::cout << std::endl;
 }
