@@ -138,23 +138,23 @@ void testFieldAdvect(){
 	int dim = 4;
 	//The MAC grid 'values'
 	float grid[] = {
-		0, 0, 0, 0,
-		0, 0, 0, 0,
-		0, 0, 0, 0,
-		0, 0, 0, 0,
+		0, 0, 0, 1,
+		0, 0, 0, 2,
+		0, 0, 0, 3,
+		7, 6, 5, 4,
 	};
 	//The velocity fields
 	float vX[] = {
-		1, 0, 2, 0, 0,
-		0, 0, 0, 1, 0,
-		0, 0, 0, 0, 1,
+		1, 0, 0, 0, 0,
+		1, 0, 0, 0, 0,
+		1, 0, 0, 0, 0,
 		1, 0, 0, 0, 0
 	};
 	float vY[] = {
-		1, 0, 2, 0,
-		0, 0, 0, 1,
+		1, 1, 1, 1,
 		0, 0, 0, 0,
-		1, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
 		0, 0, 0, 0
 	};
 	float dt = 1.f;
@@ -177,7 +177,7 @@ void testFieldAdvect(){
 		if (i != 0 && i % dim == 0){
 			std::cout << "\n";
 		}
-		std::cout << std::setw(5) << grid[i] << " ";
+		std::cout << std::setw(6) << std::setprecision(3) << grid[i] << " ";
 	}
 	std::cout << std::endl;
 }

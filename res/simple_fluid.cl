@@ -24,18 +24,42 @@ int2 grid_pos(int i, int row_len){
 	return (int2)(i % row_len, (i - i % row_len) / row_len);
 }
 /*
+* Keep a coordinate in bounds on a grid with range [0, dim] by wrapping it over
+*/
+float wrap(float a, int dim){
+	if (a < 0){
+		int offset = dim * (abs((int)a) / dim + 1);
+		return a + offset;
+	}
+	else if (a > dim){
+		int offset = dim * ((int)a / dim);
+		return a - offset;
+	}
+	return a;
+}
+/*
 * Compute the bilinear interpolated value of the field at some point in the field,
 * it's assumed that the grid cells are all of equal w/h. n_row and n_col should be
 * the number of rows and columns in the field grid.
 */
 float bilinear_interpolate(float2 pos, __global float *field, int n_row, int n_col){
+	//Wrap coordinates that go beyond the edge case, ie. that wrap the blending square
+	//completely to the other side of the grid
+	if (pos.x < -1 || pos.x > n_col){
+		pos.x = wrap(pos.x, n_col);
+	}
+	if (pos.y < -1 || pos.y > n_row){
+		pos.y = wrap(pos.y, n_row);
+	}
 	//Information about the positions and indices of the values being blended (w is idx)
 	int4 vals[4];
 	for (int i = 0; i < 4; ++i){
 		vals[i].w = elem_index(pos.x + i % 2, pos.y + i / 2, n_row, n_col);
 		vals[i].xy = grid_pos(vals[i].w, n_col);
 	}
-	//Translate position into a unit square to make the blending calculation easier and also handle wrapping
+	//Translate position into a unit square to make the blending calculation easier, but be sure
+	//to detect edge cases where the square is split across two sides of the grid, ie. the
+	//square is wrapping around
 	//*_range.x is the min value, *_range.y is the max value
 	float2 x_range, y_range;
 	if (pos.x < 0){
@@ -121,13 +145,23 @@ __kernel void advect_field(float dt, __global float *in, __global float *out,
 {
 	int2 id = (int2)(get_global_id(0), get_global_id(1));
 	int2 dim = (int2)(get_global_size(0), get_global_size(1));
-	float2 x_pos = (float2)(id.x + 0.5f, id.y);
-	float2 y_pos = (float2)(id.x, id.y + 0.5f);
+	float2 pos = (float2)(id.x, id.y);
+	float2 x_pos = (float2)(pos.x + 0.5f, pos.y);
+	float2 y_pos = (float2)(pos.x, pos.y + 0.5f);
 	//Find the velocity at this point and step back a half time step
 	float2 vel = (float2)(bilinear_interpolate(x_pos, v_x, dim.y, dim.x + 1),
 		bilinear_interpolate(y_pos, v_y, dim.y + 1, dim.x));
-	//For testing just write the blended velocity at this point, change to test each dim
-	out[id.x + id.y * dim.x] = vel.x;
+
+	//Take a half step and find the velocity to take the next
+	pos -= 0.5f * dt * vel;
+	x_pos = (float2)(pos.x + 0.5f, pos.y);
+	y_pos = (float2)(pos.x, pos.y + 0.5f);
+	vel = (float2)(bilinear_interpolate(x_pos, v_x, dim.y, dim.x + 1),
+		bilinear_interpolate(y_pos, v_y, dim.y + 1, dim.x));
+	//Take another step (is this RK2 function correct?)
+	pos -= dt * vel;
+	//Sample the grid at this pos and write it as the new value for this location
+	out[id.x + id.y * dim.x] = bilinear_interpolate(pos, in, dim.y, dim.x);
 }
 /*
 * Advect the MAC grid's x velocity field over the timestep, kernel should be run
