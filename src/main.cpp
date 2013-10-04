@@ -1,7 +1,13 @@
 #include <iostream>
 #include <iomanip>
+#include <GL/glew.h>
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
+#include <SOIL.h>
+#include "util.h"
 #include "simplefluid.h"
 #include "tinycl.h"
+#include "window.h"
 
 //Test the velocity divergence kernel
 void testVelocityDivergence();
@@ -14,11 +20,11 @@ void testFieldAdvect();
 void testVXFieldAdvect();
 //Test the y velocity field advection kernel
 void testVYFieldAdvect();
+//Test advection of an image using the velocity fields
+void testImgAdvect();
 
 int main(int argc, char **argv){
-	testFieldAdvect();
-	testVXFieldAdvect();
-	testVYFieldAdvect();
+	testImgAdvect();
 
     return 0;
 }
@@ -265,4 +271,90 @@ void testVYFieldAdvect(){
 		std::cout << std::setw(6) << std::setprecision(3) << vY[i] << " ";
 	}
 	std::cout << std::endl;
+}
+void testImgAdvect(){
+	SDL sdl(SDL_INIT_EVERYTHING);
+	Window win("Image Advection Test", 640, 480);
+	tcl::Context context(tcl::DEVICE::GPU, true, false);
+
+	//Maybe util::loadX should just throw an error
+	GLint progStatus = util::loadProgram("../res/quad_v.glsl", "../res/quad_f.glsl");
+	if (progStatus == -1){
+		return;
+	}
+	//In the program position is set to location 0, and uv is set to position 1
+	//Explicit uniform location is core in 4.3 so we still need to look up where the mvp is
+	GLuint program = progStatus;
+	GLint mvpUniform = glGetUniformLocation(program, "mvp");
+	GLint texUniform = glGetUniformLocation(program, "tex");
+
+	glm::mat4 model = glm::scale(1.5f, 1.5f, 1.f);
+	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, -5.f), glm::vec3(0.f, 0.f, 0.f),
+		glm::vec3(0.f, 1.f, 0.f));
+	glm::mat4 projection = glm::perspective(80.f, 640.f / 480.f, 0.1f, 100.f);
+	glm::mat4 mvp = projection * view * model;
+	glUseProgram(program);
+	glUniformMatrix4fv(mvpUniform, 1, GL_FALSE, glm::value_ptr(mvp));
+
+	GLuint vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	GLuint quad[2];
+	glGenBuffers(2, quad);
+	glBindBuffer(GL_ARRAY_BUFFER, quad[0]);
+	glBufferData(GL_ARRAY_BUFFER, util::quadVerts.size() * sizeof(glm::vec3),
+		&util::quadVerts[0], GL_STATIC_DRAW);
+	
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad[1]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, util::quadElems.size() * sizeof(GLushort),
+		&util::quadElems[0], GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
+	size_t uvOffset = util::quadVerts.size() / 2 * sizeof(glm::vec3);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(uvOffset));
+
+	GLuint textures[2];
+	textures[0] = SOIL_load_OGL_texture("../res/img_vert.png", SOIL_LOAD_AUTO,
+		SOIL_CREATE_NEW_ID, SOIL_FLAG_INVERT_Y);
+	glBindTexture(GL_TEXTURE_2D, textures[0]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	glActiveTexture(GL_TEXTURE1);
+	textures[1] = SOIL_load_OGL_texture("../res/img_horiz.png", SOIL_LOAD_AUTO,
+		SOIL_CREATE_NEW_ID, SOIL_FLAG_INVERT_Y);
+	glBindTexture(GL_TEXTURE_2D, textures[1]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	util::logGLError(std::cerr, "About to enter loop, final error check");
+
+	//Track which run we're on, even or odd so we know which texture to read/write too
+	//and which to draw
+	unsigned run = 0;
+	bool quit = false;
+	while (!quit){
+		SDL_Event e;
+		while (SDL_PollEvent(&e)){
+			if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)){
+				quit = true;
+			}
+		}		
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glDrawElements(GL_TRIANGLES, util::quadElems.size(), GL_UNSIGNED_SHORT, 0);
+		win.present();
+
+		SDL_Delay(250);
+		//Change our texture unit. This is how we'll pick to draw the most recently advected texture
+		run = (run + 1) % 2;
+		glUniform1i(texUniform, run);
+	}
+	
+	glDeleteTextures(2, textures);
+	glDeleteVertexArrays(1, &vao);
+	glDeleteBuffers(2, quad);
+	glDeleteProgram(program);
 }

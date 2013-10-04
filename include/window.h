@@ -16,8 +16,6 @@
 */
 class SDL {
 public:
-	//Empty constructor performs no intialization
-	SDL();
 	//Initialize SDL with desired flags
 	SDL(int flags);
 	//Initialize a desired subsytem

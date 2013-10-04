@@ -9,7 +9,6 @@
 
 #include "window.h"
 
-SDL::SDL(){}
 SDL::SDL(int flags){
 	if (SDL_Init(flags) != 0)
 		std::cout << "Failed to init!" << std::endl;
@@ -33,15 +32,17 @@ Window::Window(const std::string &title, int width, int height)
 	mWindow = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
         width, height, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
     //Make sure it created ok
-    if (mWindow == nullptr)
+    if (mWindow == nullptr){
         std::cout << "Window creation failed" << std::endl;
+	}
 
     //Get the glcontext
     mContext = SDL_GL_CreateContext(mWindow);
 	//Make sure GLEW gets running alright
 	GLenum glewErr = glewInit();
-	if (glewErr != GLEW_OK)
+	if (glewErr != GLEW_OK){
 		std::cout << "GLEW init error" << std::endl;
+	}
 
 	//Setup some properites for the context
     glEnable(GL_DEPTH_TEST);
