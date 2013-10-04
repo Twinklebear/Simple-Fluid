@@ -205,4 +205,37 @@ __kernel void advect_vy(float dt, __global float *v_y, __global float *v_y_out, 
 	//Sample the field at this pos and write it out as our new value for the location
 	v_y_out[id.x + id.y * dim.x] = bilinear_interpolate(pos, v_y, dim.y, dim.x);
 }
+/*
+* Advect some MAC grid property stored in an image using the x and y velocity
+* fields over the timestep
+* The kernel should be run with dimensions equal to those of the MAC grid
+* ie, the image dimensions
+*/
+__kernel void advect_img_field(float dt, read_only image2d_t in, write_only image2d_t out, 
+	__global float *v_x, __global float *v_y)
+{
+	int2 id = (int2)(get_global_id(0), get_global_id(1));
+	int2 dim = (int2)(get_global_size(0), get_global_size(1));
+	float2 pos = (float2)(id.x, id.y);
+	float2 x_pos = (float2)(pos.x + 0.5f, pos.y);
+	float2 y_pos = (float2)(pos.x, pos.y + 0.5f);
+	//Find the velocity at this point and step back a half time step
+	float2 vel = (float2)(bilinear_interpolate(x_pos, v_x, dim.y, dim.x + 1),
+		bilinear_interpolate(y_pos, v_y, dim.y + 1, dim.x));
 
+	//Take a half step and find the velocity to take the next
+	pos -= 0.5f * dt * vel;
+	x_pos = (float2)(pos.x + 0.5f, pos.y);
+	y_pos = (float2)(pos.x, pos.y + 0.5f);
+	vel = (float2)(bilinear_interpolate(x_pos, v_x, dim.y, dim.x + 1),
+		bilinear_interpolate(y_pos, v_y, dim.y + 1, dim.x));
+	//Take another step (is this RK2 function correct?)
+	pos -= dt * vel;
+	//Offset to the center of the pixel
+	pos += (float2)(0.5f, 0.5f) / convert_float2(get_image_dim(in));
+	//Sample the pixel we hit with wrapping and linear filtering and set this as the new value
+	//at the starting pixel
+	sampler_t linear = CLK_NORMALIZED_COORDS_TRUE | CLK_ADDRESS_REPEAT | CLK_FILTER_LINEAR;
+	float4 val = read_imagef(in, linear, pos);
+	write_imagef(out, id, val);
+}
