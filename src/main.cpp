@@ -274,7 +274,8 @@ void testVYFieldAdvect(){
 }
 void testImgAdvect(){
 	SDL sdl(SDL_INIT_EVERYTHING);
-	Window win("Image Advection Test", 640, 480);
+	const int winWidth = 640, winHeight = 480;
+	Window win("Image Advection Test", winWidth, winHeight);
 
 	//Maybe util::loadX should just throw an error
 	GLint progStatus = util::loadProgram("../res/quad_v.glsl", "../res/quad_f.glsl");
@@ -288,9 +289,10 @@ void testImgAdvect(){
 	GLint texUniform = glGetUniformLocation(program, "tex");
 
 	glm::mat4 model = glm::scale(1.5f, 1.5f, 1.f);
-	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, -5.f), glm::vec3(0.f, 0.f, 0.f),
+	glm::vec3 camPos = glm::vec3(0.f, 0.f, -5.f);
+	glm::mat4 view = glm::lookAt(camPos, glm::vec3(0.f, 0.f, 0.f),
 		glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4 projection = glm::perspective(80.f, 640.f / 480.f, 0.1f, 100.f);
+	glm::mat4 projection = glm::perspective(80.f, static_cast<float>(winWidth) / winHeight, 0.1f, 100.f);
 	glm::mat4 mvp = projection * view * model;
 	glUseProgram(program);
 	glUniformMatrix4fv(mvpUniform, 1, GL_FALSE, glm::value_ptr(mvp));
@@ -385,7 +387,7 @@ void testImgAdvect(){
 	cl::Buffer vXBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), vX);
 	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), vY, 0, true);
 
-	float dt = 1.f;
+	float dt = 1.f / 20.f;
 	//Use to track which texture is storing the output of the advection
 	//and which is being used as input.
 	unsigned texIn = 0, texOut = 1;
@@ -395,6 +397,17 @@ void testImgAdvect(){
 	kernel.setArg(0, dt);
 	kernel.setArg(3, vXBuf);
 	kernel.setArg(4, vYBuf);
+
+	//Kernel and buffers for updating clicked pixels
+	cl::Kernel setPixel(clProg, "set_pixel");
+	//since the plane is square we can just use one range buffer
+	float planeRange[] = { -1.5f, 1.5f };
+	cl::Buffer planeRangeBuf = context.buffer(tcl::MEM::READ_ONLY, 2 * sizeof(float), planeRange);
+	cl::Buffer planeClickPos = context.buffer(tcl::MEM::READ_ONLY, 2 * sizeof(float), nullptr);
+	setPixel.setArg(0, planeClickPos);
+	setPixel.setArg(1, planeRangeBuf);
+	setPixel.setArg(2, planeRangeBuf);
+
 
 	util::logGLError(std::cerr, "About to enter loop, final error check");
 
@@ -407,21 +420,50 @@ void testImgAdvect(){
 			if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)){
 				quit = true;
 			}
+			//We want to be able to click on and interact with the fluid
+			//Later will switch to click & drag interaction but for now just draw dots on the grid
+			if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(1)){
+				glm::vec4 ray((2.f * e.button.x) / winWidth - 1, 1 - (2.f * e.button.y) / winHeight, -1.f, 0.f);
+				ray = glm::inverse(projection) * ray;
+				ray.z = -1.f;
+				ray.w = 0.f;
+				ray = glm::normalize(glm::inverse(view) * ray);
+
+				//Now intersect with a plane. Later put this in a function and make a ray struct
+				//The plane normal is facing towards the camera
+				float ndotr = glm::dot(ray, glm::vec4(0, 0, 1, 0));
+				//if std::abs(ndotr) < 0.f) return
+				float t = (glm::dot(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1)) - glm::dot(camPos, glm::vec3(0, 0, 1))) / ndotr;
+				glm::vec3 hit = camPos + glm::vec3(ray) * t;
+				//The plane is from -1.5 to 1.5 in x & y
+				if (std::abs(hit.x) < 1.5 && std::abs(hit.y) < 1.5){
+					float hitPos[] = { hit.x, hit.y };
+					context.writeData(planeClickPos, 2 * sizeof(float), hitPos);
+					setPixel.setArg(3, clImg[texIn]);
+					setPixel.setArg(4, clImg[texIn]);
+					//Run the kernel to update the hit pixel
+					glFinish();
+					context.mQueue.enqueueAcquireGLObjects(&clglObjs);
+					context.runNDKernel(setPixel, cl::NDRange(1), cl::NullRange, cl::NullRange, false);
+					context.mQueue.enqueueReleaseGLObjects(&clglObjs);
+					context.mQueue.finish();
+				}
+			}
 		}
-		glUniform1i(texUniform, texOut);
+		glFinish();
 		kernel.setArg(1, clImg[texIn]);
 		kernel.setArg(2, clImg[texOut]);
-		glFinish();
 		context.mQueue.enqueueAcquireGLObjects(&clglObjs);
 		context.runNDKernel(kernel, cl::NDRange(macDim, macDim), cl::NullRange, cl::NullRange, false);
 		context.mQueue.enqueueReleaseGLObjects(&clglObjs);
 		context.mQueue.finish();
 
+		glUniform1i(texUniform, texOut);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glDrawElements(GL_TRIANGLES, util::quadElems.size(), GL_UNSIGNED_SHORT, 0);
 		win.present();
 
-		SDL_Delay(150);
+		SDL_Delay(30);
 		std::swap(texIn, texOut);
 	}
 	

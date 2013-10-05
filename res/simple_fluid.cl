@@ -239,3 +239,27 @@ __kernel void advect_img_field(float dt, read_only image2d_t in, write_only imag
 	float4 val = read_imagef(in, linear, pos);
 	write_imagef(out, id, val);
 }
+/*
+* Allow us to interact with the fluid grid by setting values for the colors when
+* clicking on the plane. Currently for testing just set the pixel clicked to red
+* pos is the x,y position the plane was clicked, x and y range are the world
+* space coordinate ranges for the plane. for this test only one kernel should be run
+* note that *_range[0] should be the min, and [1] should be the max
+*/
+__kernel void set_pixel(__global float *world_pos, __global float *x_range, __global float *y_range,
+	write_only image2d_t img, read_only image2d_t img_read)
+{
+	int2 img_dim = get_image_dim(img);
+	float2 pos = (float2)(world_pos[0], world_pos[1]);
+	//Scale coordinates into pixel space
+	//val = ((old_val - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min
+	pos.x = ((pos.x - x_range[0]) / (x_range[1] - x_range[0])) * img_dim.x;
+	pos.y = ((pos.y - y_range[0]) / (y_range[1] - y_range[0])) * img_dim.y;
+	int2 coord = (int2)(pos.x, pos.y);
+	//Because Nvidia is wierd we need to read the pixel value, multiply it by 0 and then
+	//add the color we want
+	sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_REPEAT | CLK_FILTER_NEAREST;
+	float4 color = read_imagef(img_read, sampler, coord);
+	color = color * 0.f + (float4)(1.f, 0.f, 0.f, 1.f);
+	write_imagef(img, coord, color);
+}
