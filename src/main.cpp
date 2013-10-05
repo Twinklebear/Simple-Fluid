@@ -275,7 +275,6 @@ void testVYFieldAdvect(){
 void testImgAdvect(){
 	SDL sdl(SDL_INIT_EVERYTHING);
 	Window win("Image Advection Test", 640, 480);
-	tcl::Context context(tcl::DEVICE::GPU, true, false);
 
 	//Maybe util::loadX should just throw an error
 	GLint progStatus = util::loadProgram("../res/quad_v.glsl", "../res/quad_f.glsl");
@@ -317,24 +316,90 @@ void testImgAdvect(){
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(uvOffset));
 
 	GLuint textures[2];
-	textures[0] = SOIL_load_OGL_texture("../res/img_vert.png", SOIL_LOAD_AUTO,
+	textures[0] = SOIL_load_OGL_texture("../res/img_diag.png", SOIL_LOAD_AUTO,
 		SOIL_CREATE_NEW_ID, SOIL_FLAG_INVERT_Y);
 	glBindTexture(GL_TEXTURE_2D, textures[0]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	glActiveTexture(GL_TEXTURE1);
-	textures[1] = SOIL_load_OGL_texture("../res/img_horiz.png", SOIL_LOAD_AUTO,
+	textures[1] = SOIL_load_OGL_texture("../res/img_diag.png", SOIL_LOAD_AUTO,
 		SOIL_CREATE_NEW_ID, SOIL_FLAG_INVERT_Y);
 	glBindTexture(GL_TEXTURE_2D, textures[1]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
+	//The images are 16x16
+	size_t macDim = 16;
+
+	//Now setup our OpenCL context and buffers
+	tcl::Context context(tcl::DEVICE::GPU, true, false);
+#ifdef CL_VERSION_1_2
+	cl::ImageGL clImg[2];
+#else
+	cl::Image2DGL clImg[2];
+#endif
+	std::vector<cl::Memory> clglObjs;
+	for (int i = 0; i < 2; ++i){
+		clImg[i] = context.imageGL(tcl::MEM::READ_WRITE, textures[i]);
+		clglObjs.push_back(clImg[i]);
+	}
+	const float vX[] = {
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+	};
+	const float vY[] = {
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+	};
+	//Block on the second write so we won't be waiting for the write while trying to do the first loop run
+	cl::Buffer vXBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), vX);
+	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), vY, 0, true);
+
+	float dt = 1.f;
+	//Use to track which texture is storing the output of the advection
+	//and which is being used as input.
+	unsigned texIn = 0, texOut = 1;
+
+	cl::Program clProg = context.loadProgram("../res/simple_fluid.cl");
+	cl::Kernel kernel(clProg, "advect_img_field");
+	kernel.setArg(0, dt);
+	kernel.setArg(3, vXBuf);
+	kernel.setArg(4, vYBuf);
+
 	util::logGLError(std::cerr, "About to enter loop, final error check");
 
 	//Track which run we're on, even or odd so we know which texture to read/write too
 	//and which to draw
-	unsigned run = 0;
 	bool quit = false;
 	while (!quit){
 		SDL_Event e;
@@ -342,15 +407,22 @@ void testImgAdvect(){
 			if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)){
 				quit = true;
 			}
-		}		
+		}
+		glUniform1i(texUniform, texOut);
+		kernel.setArg(1, clImg[texIn]);
+		kernel.setArg(2, clImg[texOut]);
+		glFinish();
+		context.mQueue.enqueueAcquireGLObjects(&clglObjs);
+		context.runNDKernel(kernel, cl::NDRange(macDim, macDim), cl::NullRange, cl::NullRange, false);
+		context.mQueue.enqueueReleaseGLObjects(&clglObjs);
+		context.mQueue.finish();
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glDrawElements(GL_TRIANGLES, util::quadElems.size(), GL_UNSIGNED_SHORT, 0);
 		win.present();
 
-		SDL_Delay(250);
-		//Change our texture unit. This is how we'll pick to draw the most recently advected texture
-		run = (run + 1) % 2;
-		glUniform1i(texUniform, run);
+		SDL_Delay(100);
+		std::swap(texIn, texOut);
 	}
 	
 	glDeleteTextures(2, textures);

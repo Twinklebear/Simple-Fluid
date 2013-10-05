@@ -232,7 +232,7 @@ __kernel void advect_img_field(float dt, read_only image2d_t in, write_only imag
 	//Take another step (is this RK2 function correct?)
 	pos -= dt * vel;
 	//Offset to the center of the pixel
-	pos += (float2)(0.5f, 0.5f) / convert_float2(get_image_dim(in));
+	pos = (pos + (float2)(0.5f, 0.5f)) / convert_float2(get_image_dim(in));
 	//Sample the pixel we hit with wrapping and linear filtering and set this as the new value
 	//at the starting pixel
 	sampler_t linear = CLK_NORMALIZED_COORDS_TRUE | CLK_ADDRESS_REPEAT | CLK_FILTER_LINEAR;

@@ -154,7 +154,7 @@ void tcl::Context::selectDevice(DEVICE dev, bool profile){
 	}
 }
 void tcl::Context::selectInteropDevice(DEVICE dev, bool profile){
-try {
+	try {
 		//We assume only the first device and platform will be used
 		//This is after all a lazy implementation
 		cl::Platform::get(&mPlatforms);
@@ -172,6 +172,7 @@ try {
 				}
 			}
 		}
+		//Some different stuff for linux/mac should be used for these properties
 		cl_context_properties properties[] = {
 			CL_GL_CONTEXT_KHR, (cl_context_properties)wglGetCurrentContext(),
 			CL_WGL_HDC_KHR, (cl_context_properties)wglGetCurrentDC(),
@@ -199,7 +200,6 @@ try {
 		logCLError(e, "Context::selectInteropDevice");
 		throw e;
 	}
-
 }
 void tcl::Context::logCLError(const cl::Error &e, const std::string &msg) const {
 	std::cout << msg << " error: " << e.what() << ", code: " << e.err() << "\n";
