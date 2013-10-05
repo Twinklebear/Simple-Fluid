@@ -421,7 +421,7 @@ void testImgAdvect(){
 		glDrawElements(GL_TRIANGLES, util::quadElems.size(), GL_UNSIGNED_SHORT, 0);
 		win.present();
 
-		SDL_Delay(100);
+		SDL_Delay(150);
 		std::swap(texIn, texOut);
 	}
 	

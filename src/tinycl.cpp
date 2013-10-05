@@ -24,7 +24,7 @@ cl::Program tcl::Context::loadProgram(const std::string &file){
 		return prog;
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::loadProgram");
+		util::logCLError(std::cout, e, "Context::loadProgram");
 		if (e.err() == CL_BUILD_PROGRAM_FAILURE){
 			std::cout << "Building program failed, error log:\n"
 				<< prog.getBuildInfo<CL_PROGRAM_BUILD_LOG>(mDevices.at(0))
@@ -44,7 +44,7 @@ cl::Buffer tcl::Context::buffer(MEM mem, size_t size, const void *data, size_t o
 		return buf;
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::buffer");
+		util::logCLError(std::cout, e, "Context::buffer");
 		throw e;
 	}
 }
@@ -53,7 +53,7 @@ cl::BufferGL tcl::Context::bufferGL(MEM mem, GLuint buf){
 		return cl::BufferGL(mContext, static_cast<cl_mem_flags>(mem), buf);
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::bufferGL");
+		util::logCLError(std::cout, e, "Context::bufferGL");
 		throw e;
 	}
 }
@@ -63,7 +63,7 @@ cl::ImageGL tcl::Context::imageGL(MEM mem, GLuint tex){
 		return cl::ImageGL(mContext, static_cast<cl_mem_flags>(mem), 0, tex);
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::imageGL");
+		util::logCLError(std::cout, e, "Context::imageGL");
 		throw e;
 	}
 }
@@ -74,7 +74,7 @@ cl::Image2DGL tcl::Context::imageGL(MEM mem, GLuint tex){
 		return cl::Image2DGL(mContext, static_cast<cl_mem_flags>(mem), GL_TEXTURE_2D, 0, tex);
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::imageGL");
+		util::logCLError(std::cout, e, "Context::imageGL");
 		throw e;
 	}
 }
@@ -87,7 +87,7 @@ void tcl::Context::writeData(cl::Buffer &buf, size_t size, const void *data, siz
 		mQueue.enqueueWriteBuffer(buf, blocking, offset, size, data, depends, notify);
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::writeData to buffer");
+		util::logCLError(std::cout, e, "Context::writeData to buffer");
 		throw e;
 	}
 }
@@ -98,7 +98,7 @@ void tcl::Context::readData(const cl::Buffer &buf, size_t size, void *data, size
 		mQueue.enqueueReadBuffer(buf, blocking, offset, size, data, depends, notify);
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::readData from buffer");
+		util::logCLError(std::cout, e, "Context::readData from buffer");
 		throw e;
 	}
 }
@@ -110,7 +110,7 @@ void tcl::Context::runNDKernel(cl::Kernel &kernel, cl::NDRange global, cl::NDRan
 		mQueue.enqueueNDRangeKernel(kernel, offset, global, local, depends, notify);
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::runNDKernel");
+		util::logCLError(std::cout, e, "Context::runNDKernel");
 		throw e;
 	}
 }
@@ -149,7 +149,7 @@ void tcl::Context::selectDevice(DEVICE dev, bool profile){
 		}
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::selectDevice");
+		util::logCLError(std::cout, e, "Context::selectDevice");
 		throw e;
 	}
 }
@@ -197,10 +197,7 @@ void tcl::Context::selectInteropDevice(DEVICE dev, bool profile){
 			<< std::endl;
 	}
 	catch (const cl::Error &e){
-		logCLError(e, "Context::selectInteropDevice");
+		util::logCLError(std::cout, e, "Context::selectInteropDevice");
 		throw e;
 	}
-}
-void tcl::Context::logCLError(const cl::Error &e, const std::string &msg) const {
-	std::cout << msg << " error: " << e.what() << ", code: " << e.err() << "\n";
 }

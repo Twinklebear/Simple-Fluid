@@ -114,10 +114,6 @@ namespace tcl {
 		* @param profile If we want profiling info available
 		*/
 		void selectInteropDevice(DEVICE dev, bool profile);
-		/*
-		* Log an OpenCL error to stdout
-		*/
-		void logCLError(const cl::Error &e, const std::string &msg) const;
 
 	public:
 		std::vector<cl::Platform> mPlatforms;
