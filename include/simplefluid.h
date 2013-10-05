@@ -50,10 +50,6 @@ private:
 	Window &window;
 	SparseMatrix<float> interactionMat;
 	CGSolver cgSolver;
-	//The quad to be used for drawing the fluid texture
-	const static std::array<glm::vec3, 8> quad;
-	//The quad's element buffer
-	const static std::array<unsigned short, 6> quadElems;
 };
 
 #endif

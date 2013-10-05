@@ -6,23 +6,6 @@
 #include "sparsematrix.h"
 #include "simplefluid.h"
 
-const std::array<glm::vec3, 8> SimpleFluid::quad = {
-	//Vertex positions
-	glm::vec3(-1.0, -1.0, 0.0),
-	glm::vec3(1.0, -1.0, 0.0),
-	glm::vec3(-1.0, 1.0, 0.0),
-	glm::vec3(1.0, 1.0, 0.0),
-	//UV coords
-	glm::vec3(0.0, 0.0, 0.0),
-	glm::vec3(1.0, 0.0, 0.0),
-	glm::vec3(0.0, 1.0, 1.0),
-	glm::vec3(1.0, 1.0, 0.0)
-};
-const std::array<unsigned short, 6> SimpleFluid::quadElems = {
-		0, 1, 2,
-		1, 3, 2
-};
-
 SimpleFluid::SimpleFluid(int dim, Window &win) 
 	: context(tcl::DEVICE::GPU, true, false), dim(dim), window(win),
 	interactionMat(createInteractionMatrix()), cgSolver(interactionMat, std::vector<float>(), context)
