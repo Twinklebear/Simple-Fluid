@@ -422,7 +422,13 @@ void testImgAdvect(){
 			}
 			//We want to be able to click on and interact with the fluid
 			//Later will switch to click & drag interaction but for now just draw dots on the grid
-			if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(1)){
+			//For setting velocity we'll base the force on how much the mouse has moved
+			//This only seems to work if the mouse moved a bit or clicked, but if the mouse was just sitting
+			//and the button held down it doesn't say the button is down. same for SDL_GetMouseState
+			int mouseDelta[2];
+			if (SDL_GetRelativeMouseState(&mouseDelta[0], &mouseDelta[1]) & SDL_BUTTON(1)){
+				std::cout << "Mouse motion: [" << mouseDelta[0] << ", " << mouseDelta[1] << "]\n";
+
 				glm::vec4 ray((2.f * e.button.x) / winWidth - 1, 1 - (2.f * e.button.y) / winHeight, -1.f, 0.f);
 				ray = glm::inverse(projection) * ray;
 				ray.z = -1.f;
