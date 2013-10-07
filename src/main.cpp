@@ -346,7 +346,8 @@ void testImgAdvect(){
 		clImg[i] = context.imageGL(tcl::MEM::READ_WRITE, textures[i]);
 		clglObjs.push_back(clImg[i]);
 	}
-	const float vX[] = {
+	const float vX[16 * 17] = { 0 };
+		/*
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -364,7 +365,9 @@ void testImgAdvect(){
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 	};
-	const float vY[] = {
+	*/
+	const float vY[16 * 17] = { 0 };
+	/*
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -383,9 +386,9 @@ void testImgAdvect(){
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 	};
-	//Block on the second write so we won't be waiting for the write while trying to do the first loop run
+	*/
 	cl::Buffer vXBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), vX);
-	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), vY, 0, true);
+	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), vY);
 
 	float dt = 1.f / 20.f;
 	//Use to track which texture is storing the output of the advection
@@ -393,10 +396,10 @@ void testImgAdvect(){
 	unsigned texIn = 0, texOut = 1;
 
 	cl::Program clProg = context.loadProgram("../res/simple_fluid.cl");
-	cl::Kernel kernel(clProg, "advect_img_field");
-	kernel.setArg(0, dt);
-	kernel.setArg(3, vXBuf);
-	kernel.setArg(4, vYBuf);
+	cl::Kernel advectImgField(clProg, "advect_img_field");
+	advectImgField.setArg(0, dt);
+	advectImgField.setArg(3, vXBuf);
+	advectImgField.setArg(4, vYBuf);
 
 	//Kernel and buffers for updating clicked pixels
 	cl::Kernel setPixel(clProg, "set_pixel");
@@ -408,6 +411,15 @@ void testImgAdvect(){
 	setPixel.setArg(1, planeRangeBuf);
 	setPixel.setArg(2, planeRangeBuf);
 
+	int gridDim[2] = { macDim, macDim };
+	cl::Kernel applyForce(clProg, "apply_force");
+	cl::Buffer clickForce = context.buffer(tcl::MEM::READ_ONLY, 2 * sizeof(float), nullptr);
+	cl::Buffer gridDimBuf = context.buffer(tcl::MEM::READ_ONLY, 2 * sizeof(int), gridDim);
+	applyForce.setArg(0, dt);
+	applyForce.setArg(1, clickForce);
+	applyForce.setArg(2, vXBuf);
+	applyForce.setArg(3, vYBuf);
+	applyForce.setArg(4, gridDimBuf);
 
 	util::logGLError(std::cerr, "About to enter loop, final error check");
 
@@ -427,7 +439,9 @@ void testImgAdvect(){
 			//and the button held down it doesn't say the button is down. same for SDL_GetMouseState
 			int mouseDelta[2];
 			if (SDL_GetRelativeMouseState(&mouseDelta[0], &mouseDelta[1]) & SDL_BUTTON(1)){
-				std::cout << "Mouse motion: [" << mouseDelta[0] << ", " << mouseDelta[1] << "]\n";
+				//The coordinate system being used in the simulation is inverted
+				float force[] = { -mouseDelta[0], -mouseDelta[1] };
+				context.writeData(clickForce, 2 * sizeof(float), force);
 
 				glm::vec4 ray((2.f * e.button.x) / winWidth - 1, 1 - (2.f * e.button.y) / winHeight, -1.f, 0.f);
 				ray = glm::inverse(projection) * ray;
@@ -443,24 +457,31 @@ void testImgAdvect(){
 				glm::vec3 hit = camPos + glm::vec3(ray) * t;
 				//The plane is from -1.5 to 1.5 in x & y
 				if (std::abs(hit.x) < 1.5 && std::abs(hit.y) < 1.5){
-					float hitPos[] = { hit.x, hit.y };
-					context.writeData(planeClickPos, 2 * sizeof(float), hitPos);
-					setPixel.setArg(3, clImg[texIn]);
-					setPixel.setArg(4, clImg[texIn]);
-					//Run the kernel to update the hit pixel
-					glFinish();
-					context.mQueue.enqueueAcquireGLObjects(&clglObjs);
-					context.runNDKernel(setPixel, cl::NDRange(1), cl::NullRange, cl::NullRange, false);
-					context.mQueue.enqueueReleaseGLObjects(&clglObjs);
-					context.mQueue.finish();
+					//Start the apply force kernel
+					int pxPos[] = {
+						((hit.x - planeRange[0]) / (planeRange[1] - planeRange[0])) * macDim,
+						((hit.y - planeRange[0]) / (planeRange[1] - planeRange[0])) * macDim
+					};
+					context.runNDKernel(applyForce, cl::NDRange(2, 2), cl::NullRange, cl::NDRange(pxPos[0], pxPos[1]), false);
+
+					//float hitPos[] = { hit.x, hit.y };
+					//context.writeData(planeClickPos, 2 * sizeof(float), hitPos);
+					//setPixel.setArg(3, clImg[texIn]);
+					//setPixel.setArg(4, clImg[texIn]);
+					////Run the kernel to update the hit pixel and the velocity at the pixel
+					//glFinish();
+					//context.mQueue.enqueueAcquireGLObjects(&clglObjs);
+					//context.runNDKernel(setPixel, cl::NDRange(1), cl::NullRange, cl::NullRange, false);
+					//context.mQueue.enqueueReleaseGLObjects(&clglObjs);
+					//context.mQueue.finish();
 				}
 			}
 		}
 		glFinish();
-		kernel.setArg(1, clImg[texIn]);
-		kernel.setArg(2, clImg[texOut]);
+		advectImgField.setArg(1, clImg[texIn]);
+		advectImgField.setArg(2, clImg[texOut]);
 		context.mQueue.enqueueAcquireGLObjects(&clglObjs);
-		context.runNDKernel(kernel, cl::NDRange(macDim, macDim), cl::NullRange, cl::NullRange, false);
+		context.runNDKernel(advectImgField, cl::NDRange(macDim, macDim), cl::NullRange, cl::NullRange, false);
 		context.mQueue.enqueueReleaseGLObjects(&clglObjs);
 		context.mQueue.finish();
 

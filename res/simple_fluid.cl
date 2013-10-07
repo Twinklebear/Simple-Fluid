@@ -263,3 +263,49 @@ __kernel void set_pixel(__global float *world_pos, __global float *x_range, __gl
 	color = color * 0.f + (float4)(1.f, 0.f, 0.f, 1.f);
 	write_imagef(img, coord, color);
 }
+/*
+* Allows us to interact with the fluid by applying forces to cells
+* The kernel should be run with a global offset to where the top-left corner of the brush
+* will be and as a 2d work group with dimensions equal to the brush size
+* The force should be a float[2] where [0] is x force and [1] is y force
+* To avoid adding twice to shared velocity values in the grid when using a >1 cell brush
+* we only add to the high idx velocity value and on the 0 ids for x/y we add to the low idx
+* only
+*/
+__kernel void apply_force(float dt, __constant float *force, __global float *v_x, __global float *v_y,
+	__constant int* dim)
+{
+	int2 id = (int2)(get_global_id(0), get_global_id(1));
+	int2 work_dim = (int2)(get_global_size(0), get_global_size(1));
+	float2 pos = (float2)(id.x + 0.5f, id.y);
+	if (work_dim.x == 1){
+		int v_idx = elem_index(pos.x, pos.y, dim[1], dim[0] + 1);
+		v_x[v_idx] += force[0] * dt;
+		v_idx = elem_index(pos.x + 1.f, pos.y, dim[1], dim[0] + 1);
+		v_x[v_idx] += force[0] * dt;
+	}
+	else if (id.x == 0){
+		int v_idx = elem_index(pos.x, pos.y, dim[1], dim[0] + 1);
+		v_x[v_idx] += force[0] * dt;
+	}
+	else {
+		int v_idx = elem_index(pos.x + 1.f, pos.y, dim[1], dim[0] + 1);
+		v_x[v_idx] += force[0] * dt;
+	}
+
+	pos = (float2)(id.x, id.y + 0.5f);
+	if (work_dim.y == 1){
+		int v_idx = elem_index(pos.x, pos.y, dim[1] + 1, dim[0]);
+		v_y[v_idx] += force[1] * dt;
+		v_idx = elem_index(pos.x, pos.y + 1.f, dim[1] + 1, dim[0]);
+		v_y[v_idx] += force[1] * dt;
+	}
+	else if (id.y == 0){
+		int v_idx = elem_index(pos.x, pos.y, dim[1] + 1, dim[0]);
+		v_y[v_idx] += force[1] * dt;
+	}
+	else {
+		int v_idx = elem_index(pos.x, pos.y + 1.f, dim[1] + 1, dim[0]);
+		v_y[v_idx] += force[1] * dt;
+	}
+}
