@@ -92,12 +92,12 @@ namespace tcl {
 		* @param global Global group dimensions
 		* @param local Local group dimensions
 		* @param offset Group dimension # offset
-		* @param blocking If this call should be blocking
+		* @param blocking If this call should be blocking, default false
 		* @param depends Events this operation depends on
 		* @param notify Event that this operation should notify upon completion
 		*/
 		void runNDKernel(cl::Kernel &kernel, cl::NDRange global, cl::NDRange local,
-			cl::NDRange offset, bool blocking, const std::vector<cl::Event> *depends = nullptr,
+			cl::NDRange offset, bool blocking = false, const std::vector<cl::Event> *depends = nullptr,
 			cl::Event *notify = nullptr);
 
 	private:
