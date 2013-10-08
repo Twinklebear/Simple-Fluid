@@ -9,6 +9,8 @@
 #include "tinycl.h"
 #include "window.h"
 
+//Test CG for how it'll be used in the simulation
+void testCGSim();
 //Test the velocity divergence kernel
 void testVelocityDivergence();
 //Test the pressure subtraction to update the velocity field
@@ -24,6 +26,8 @@ void testVYFieldAdvect();
 void testImgAdvect();
 
 int main(int argc, char **argv){
+	testCGSim();
+	/*
 	//Try it out!
 	SDL sdl(SDL_INIT_EVERYTHING);
 	Window win("Fluid!", 640, 480);
@@ -31,8 +35,56 @@ int main(int argc, char **argv){
 	SimpleFluid fluidSim(16, win);
 	fluidSim.initSim();
 	fluidSim.runSim();
+	*/
 
     return 0;
+}
+//Some extras we need
+int cellNumber(int x, int y, int dim){
+	if (x < 0){
+		x += dim * (std::abs(x / dim) + 1);
+	}
+	if (y < 0){
+		y += dim * (std::abs(y / dim) + 1);
+	}
+	return x % dim + (y % dim) * dim;
+}
+void cellPos(int n, int dim, int &x, int &y){
+	x = n % dim;
+	y = (n - x) / dim;
+}
+SparseMatrix<float> createInteractionMatrix(int dim){
+	std::vector<MatrixElement<float>> elems;
+	int nCells = dim * dim;
+	for (int i = 0; i < nCells; ++i){
+		//In the matrix all diagonal entires are 4 and neighbor cells are -1
+		elems.push_back(MatrixElement<float>(i, i, 4));
+		int x, y;
+		cellPos(i, dim, x, y);
+		elems.push_back(MatrixElement<float>(i, cellNumber(x - 1, y, dim), -1));
+		elems.push_back(MatrixElement<float>(i, cellNumber(x + 1, y, dim), -1));
+		elems.push_back(MatrixElement<float>(i, cellNumber(x, y - 1, dim), -1));
+		elems.push_back(MatrixElement<float>(i, cellNumber(x, y + 1, dim), -1));
+	}
+	return SparseMatrix<float>(elems, dim, true);
+}
+void testCGSim(){
+	//TODO: CG Solver is unreliable & inaccurate! And gets much more so as dimensions increase
+	tcl::Context context(tcl::DEVICE::GPU, false, false);
+	int dim = 12;
+	SparseMatrix<float> interactionMat = createInteractionMatrix(dim);
+	CGSolver solver(interactionMat, std::vector<float>(), context);
+	std::vector<float> b;
+	for (int i = 0; i < dim * dim; ++i){
+		b.push_back(i);
+	}
+	cl::Buffer bBuf = context.buffer(tcl::MEM::READ_WRITE, b.size() * sizeof(float), &b[0]);
+	solver.updateB(bBuf);
+
+	for (int i = 0; i < 10; ++i){
+		std::cout << "Solution attempt # " << i << "\n";
+		solver.solve();
+	}
 }
 void testVelocityDivergence(){
 	tcl::Context context(tcl::DEVICE::GPU, false, false);
