@@ -24,7 +24,13 @@ void testVYFieldAdvect();
 void testImgAdvect();
 
 int main(int argc, char **argv){
-	testImgAdvect();
+	//Try it out!
+	SDL sdl(SDL_INIT_EVERYTHING);
+	Window win("Fluid!", 640, 480);
+	//16 is the dimensions of the textures we're loading
+	SimpleFluid fluidSim(16, win);
+	fluidSim.initSim();
+	fluidSim.runSim();
 
     return 0;
 }
@@ -449,7 +455,6 @@ void testImgAdvect(){
 				//Now intersect with a plane. Later put this in a function and make a ray struct
 				//The plane normal is facing towards the camera
 				float ndotr = glm::dot(ray, glm::vec4(0, 0, 1, 0));
-				//if std::abs(ndotr) < 0.f) return
 				float t = (glm::dot(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1)) - glm::dot(camPos, glm::vec3(0, 0, 1))) / ndotr;
 				glm::vec3 hit = camPos + glm::vec3(ray) * t;
 				//The plane is from -1.5 to 1.5 in x & y
@@ -459,7 +464,7 @@ void testImgAdvect(){
 						((hit.x - planeRange[0]) / (planeRange[1] - planeRange[0])) * macDim,
 						((hit.y - planeRange[0]) / (planeRange[1] - planeRange[0])) * macDim
 					};
-					context.runNDKernel(applyForce, cl::NDRange(2, 2), cl::NullRange, cl::NDRange(pxPos[0], pxPos[1]), false);
+					context.runNDKernel(applyForce, cl::NDRange(1, 1), cl::NullRange, cl::NDRange(pxPos[0], pxPos[1]), false);
 
 
 					setPixel.setArg(1, clImg[texIn]);
@@ -482,7 +487,7 @@ void testImgAdvect(){
 		context.mQueue.finish();
 
 		glUniform1i(texUniform, texOut);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		win.clear();
 		glDrawElements(GL_TRIANGLES, util::quadElems.size(), GL_UNSIGNED_SHORT, 0);
 		win.present();
 
