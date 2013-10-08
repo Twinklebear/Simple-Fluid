@@ -79,7 +79,7 @@ void CGSolver::createBuffers(const SparseMatrix<float> &mat, const std::vector<f
 
 	//In the case that we want to upload everything but the b vector, skip creating it
 	if (!b.empty()){
-		bVec = context.buffer(tcl::MEM::READ_ONLY, b.size() * sizeof(float), &b[0]);
+		bVec = context.buffer(tcl::MEM::READ_ONLY, dimensions * sizeof(float), &b[0]);
 	}
 	result = context.buffer(tcl::MEM::READ_WRITE, dimensions * sizeof(float), nullptr);
 

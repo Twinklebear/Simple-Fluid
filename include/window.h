@@ -45,10 +45,13 @@ public:
     void clear();
     //Present the renderer, ie. update screen
     void present();
+	//Get the window dimensions
+	void getDim(int &width, int &height);
 
 private:
 	SDL_Window *mWindow;
 	SDL_GLContext mContext;
+	int mDim[2];
 };
 
 #endif

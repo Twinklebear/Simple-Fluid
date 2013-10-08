@@ -29,8 +29,10 @@ Window::Window(const std::string &title, int width, int height)
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
     //Create our window
+	mDim[0] = width;
+	mDim[1] = height;
 	mWindow = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-        width, height, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+        mDim[0], mDim[1], SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
     //Make sure it created ok
     if (mWindow == nullptr){
         std::cout << "Window creation failed" << std::endl;
@@ -67,4 +69,8 @@ void Window::clear(){
 void Window::present(){
 	glFlush();
     SDL_GL_SwapWindow(mWindow);
+}
+void Window::getDim(int &width, int &height){
+	width = mDim[0];
+	height = mDim[1];
 }
