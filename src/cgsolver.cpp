@@ -43,11 +43,9 @@ void CGSolver::solve(){
 }
 void CGSolver::updateB(const std::vector<float> &b){
 	bVec = context.buffer(tcl::MEM::READ_ONLY, dimensions * sizeof(float), &b[0]);
-	initVects.setArg(3, bVec);
 }
 void CGSolver::updateB(cl::Buffer &b){
 	bVec = b;
-	initVects.setArg(3, bVec);
 }
 std::vector<float> CGSolver::getResult(){
 	std::vector<float> res;

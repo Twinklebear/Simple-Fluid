@@ -208,7 +208,6 @@ void SimpleFluid::initCLBuffers(){
 #endif
 
 	velNegDivergence = context.buffer(tcl::MEM::READ_WRITE, dim * dim * sizeof(float), nullptr);
-	cgSolver.updateB(velNegDivergence);
 
 	float color[] = { 1.f, 1.f, 1.f, 1.f };
 	int macDim[] = { dim, dim };
@@ -229,6 +228,7 @@ void SimpleFluid::initCLKernels(){
 	apply_force = cl::Kernel(clProg, "apply_force");
 
 	velocity_divergence.setArg(2, velNegDivergence);
+	cgSolver.updateB(velNegDivergence);
 	//Note: Some properties flip in/out buffers each step so those params aren't set here
 	//TODO: Configurable rho values, should probably also effect force application
 	float rho = 1.f;
