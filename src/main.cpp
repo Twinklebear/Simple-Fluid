@@ -346,49 +346,13 @@ void testImgAdvect(){
 		clImg[i] = context.imageGL(tcl::MEM::READ_WRITE, textures[i]);
 		clglObjs.push_back(clImg[i]);
 	}
-	const float vX[16 * 17] = { 0 };
-		/*
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-	};
-	*/
-	const float vY[16 * 17] = { 0 };
-	/*
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-	};
-	*/
-	cl::Buffer vXBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), vX);
-	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), vY);
+	const float zero_vel[16 * 17] = { 0 };
+	cl::Buffer vXBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), zero_vel);
+	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), zero_vel);
+	//If OpenCL 1.2 is available make use of
+	//cl::CommandQueue::enqueueFillBuffer(buffer, pattern, offset, size, events, event);
+	//where pattern would be 0.f
+	
 
 	float dt = 1.f / 20.f;
 	//Use to track which texture is storing the output of the advection
@@ -405,11 +369,9 @@ void testImgAdvect(){
 	cl::Kernel setPixel(clProg, "set_pixel");
 	//since the plane is square we can just use one range buffer
 	float planeRange[] = { -1.5f, 1.5f };
-	cl::Buffer planeRangeBuf = context.buffer(tcl::MEM::READ_ONLY, 2 * sizeof(float), planeRange);
-	cl::Buffer planeClickPos = context.buffer(tcl::MEM::READ_ONLY, 2 * sizeof(float), nullptr);
-	setPixel.setArg(0, planeClickPos);
-	setPixel.setArg(1, planeRangeBuf);
-	setPixel.setArg(2, planeRangeBuf);
+	float brushColor[] = { 1.f, 1.f, 1.f, 1.f };
+	cl::Buffer brushColBuf = context.buffer(tcl::MEM::READ_ONLY, 4 * sizeof(float), brushColor);
+	setPixel.setArg(0, brushColBuf);
 
 	int gridDim[2] = { macDim, macDim };
 	cl::Kernel applyForce(clProg, "apply_force");
@@ -431,6 +393,41 @@ void testImgAdvect(){
 		while (SDL_PollEvent(&e)){
 			if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)){
 				quit = true;
+			}
+			//Select the brush color
+			if (e.type == SDL_KEYDOWN){
+				bool updateColor = false;
+				switch (e.key.keysym.sym){
+				case SDLK_1:
+					brushColor[0] = 1.f;
+					brushColor[1] = 0.f;
+					brushColor[2] = 0.f;
+					updateColor = true;
+					break;
+				case SDLK_2:
+					brushColor[0] = 0.f;
+					brushColor[1] = 1.f;
+					brushColor[2] = 0.f;
+					updateColor = true;
+					break;
+				case SDLK_3:
+					brushColor[0] = 0.f;
+					brushColor[1] = 0.f;
+					brushColor[2] = 1.f;
+					updateColor = true;
+					break;
+				case SDLK_4:
+					brushColor[0] = 1.f;
+					brushColor[1] = 1.f;
+					brushColor[2] = 1.f;
+					updateColor = true;
+					break;
+				default:
+					break;
+				}
+				if (updateColor){
+					context.writeData(brushColBuf, 3 * sizeof(float), brushColor);
+				}
 			}
 			//We want to be able to click on and interact with the fluid
 			//Later will switch to click & drag interaction but for now just draw dots on the grid
@@ -464,16 +461,15 @@ void testImgAdvect(){
 					};
 					context.runNDKernel(applyForce, cl::NDRange(2, 2), cl::NullRange, cl::NDRange(pxPos[0], pxPos[1]), false);
 
-					//float hitPos[] = { hit.x, hit.y };
-					//context.writeData(planeClickPos, 2 * sizeof(float), hitPos);
-					//setPixel.setArg(3, clImg[texIn]);
-					//setPixel.setArg(4, clImg[texIn]);
-					////Run the kernel to update the hit pixel and the velocity at the pixel
-					//glFinish();
-					//context.mQueue.enqueueAcquireGLObjects(&clglObjs);
-					//context.runNDKernel(setPixel, cl::NDRange(1), cl::NullRange, cl::NullRange, false);
-					//context.mQueue.enqueueReleaseGLObjects(&clglObjs);
-					//context.mQueue.finish();
+
+					setPixel.setArg(1, clImg[texIn]);
+					setPixel.setArg(2, clImg[texIn]);
+					//Run the kernel to update the hit pixel and the velocity at the pixel
+					glFinish();
+					context.mQueue.enqueueAcquireGLObjects(&clglObjs);
+					context.runNDKernel(setPixel, cl::NDRange(1, 1), cl::NullRange, cl::NDRange(pxPos[0], pxPos[1]), false);
+					context.mQueue.enqueueReleaseGLObjects(&clglObjs);
+					context.mQueue.finish();
 				}
 			}
 		}
