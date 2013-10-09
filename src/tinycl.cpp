@@ -24,20 +24,20 @@ cl::Program tcl::Context::loadProgram(const std::string &file){
 		return prog;
 	}
 	catch (const cl::Error &e){
-		util::logCLError(std::cout, e, "Context::loadProgram");
 		if (e.err() == CL_BUILD_PROGRAM_FAILURE){
 			std::cout << "Building program failed, error log:\n"
 				<< prog.getBuildInfo<CL_PROGRAM_BUILD_LOG>(mDevices.at(0))
 				<< "\n";
 		}
+		util::logCLError(std::cout, e, "Context::loadProgram");
 		throw e;
 	}
 }
-cl::Buffer tcl::Context::buffer(MEM mem, size_t size, const void *data, size_t offset, bool blocking,
+cl::Buffer tcl::Context::buffer(int mem, size_t size, const void *data, size_t offset, bool blocking,
 	const std::vector<cl::Event> *depends, cl::Event *notify)
 {
 	try {
-		cl::Buffer buf(mContext, static_cast<cl_mem_flags>(mem), size);
+		cl::Buffer buf(mContext, mem, size);
 		if (data != nullptr){
 			mQueue.enqueueWriteBuffer(buf, blocking, offset, size, data, depends, notify);
 		}
@@ -48,9 +48,9 @@ cl::Buffer tcl::Context::buffer(MEM mem, size_t size, const void *data, size_t o
 		throw e;
 	}
 }
-cl::BufferGL tcl::Context::bufferGL(MEM mem, GLuint buf){
+cl::BufferGL tcl::Context::bufferGL(int mem, GLuint buf){
 	try {
-		return cl::BufferGL(mContext, static_cast<cl_mem_flags>(mem), buf);
+		return cl::BufferGL(mContext, mem, buf);
 	}
 	catch (const cl::Error &e){
 		util::logCLError(std::cout, e, "Context::bufferGL");
@@ -58,9 +58,9 @@ cl::BufferGL tcl::Context::bufferGL(MEM mem, GLuint buf){
 	}
 }
 #ifdef CL_VERSION_1_2
-cl::ImageGL tcl::Context::imageGL(MEM mem, GLuint tex){
+cl::ImageGL tcl::Context::imageGL(int mem, GLuint tex){
 	try {
-		return cl::ImageGL(mContext, static_cast<cl_mem_flags>(mem), 0, tex);
+		return cl::ImageGL(mContext, mem, 0, tex);
 	}
 	catch (const cl::Error &e){
 		util::logCLError(std::cout, e, "Context::imageGL");
@@ -69,9 +69,9 @@ cl::ImageGL tcl::Context::imageGL(MEM mem, GLuint tex){
 }
 
 #else
-cl::Image2DGL tcl::Context::imageGL(MEM mem, GLuint tex){
+cl::Image2DGL tcl::Context::imageGL(int mem, GLuint tex){
 	try {
-		return cl::Image2DGL(mContext, static_cast<cl_mem_flags>(mem), GL_TEXTURE_2D, 0, tex);
+		return cl::Image2DGL(mContext, mem, GL_TEXTURE_2D, 0, tex);
 	}
 	catch (const cl::Error &e){
 		util::logCLError(std::cout, e, "Context::imageGL");
@@ -120,7 +120,7 @@ void tcl::Context::selectDevice(DEVICE dev, bool profile){
 		//Find the first device that is the type we want
 		for (int i = 0; mDevices.empty(); ++i){
 			try {
-				mPlatforms.at(i).getDevices(static_cast<cl_device_type>(dev), &mDevices);
+				mPlatforms.at(i).getDevices(dev, &mDevices);
 			}
 			catch (const cl::Error &e){
 				if (e.err() == CL_DEVICE_NOT_FOUND){
@@ -161,7 +161,7 @@ void tcl::Context::selectInteropDevice(DEVICE dev, bool profile){
 		//Find the first device that is the type we want
 		for (int i = 0; mDevices.empty(); ++i){
 			try {
-				mPlatforms.at(i).getDevices(static_cast<cl_device_type>(dev), &mDevices);
+				mPlatforms.at(i).getDevices(dev, &mDevices);
 			}
 			catch (const cl::Error &e){
 				if (e.err() == CL_DEVICE_NOT_FOUND){

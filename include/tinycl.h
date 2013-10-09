@@ -5,8 +5,9 @@
 #include <CL/cl.hpp>
 
 namespace tcl {
-	enum class DEVICE { CPU = CL_DEVICE_TYPE_CPU, GPU = CL_DEVICE_TYPE_GPU };
-	enum class MEM { READ_ONLY = CL_MEM_READ_ONLY, WRITE_ONLY = CL_MEM_WRITE_ONLY,
+	//I should just remove these..
+	enum DEVICE { CPU = CL_DEVICE_TYPE_CPU, GPU = CL_DEVICE_TYPE_GPU };
+	enum MEM { READ_ONLY = CL_MEM_READ_ONLY, WRITE_ONLY = CL_MEM_WRITE_ONLY,
 		READ_WRITE = CL_MEM_READ_WRITE };
 
 	/*
@@ -41,7 +42,7 @@ namespace tcl {
 		* @param depends Events this operation depends on, default none
 		* @param notify Event that this operation should notify upon completion, default none
 		*/
-		cl::Buffer buffer(MEM mem, size_t size, const void *data, size_t offset = 0, bool blocking = false,
+		cl::Buffer buffer(int mem, size_t size, const void *data, size_t offset = 0, bool blocking = false,
 			const std::vector<cl::Event> *depends = nullptr, cl::Event *notify = nullptr);
 		/*
 		* Create a buffer to make use of an existing OpenGL buffer for data
@@ -49,7 +50,7 @@ namespace tcl {
 		* @param mem Type of memory we want to create
 		* @param buf The GL buffer we'll be using for storage
 		*/
-		cl::BufferGL bufferGL(MEM mem, GLuint buf);
+		cl::BufferGL bufferGL(int mem, GLuint buf);
 		/*
 		* Create an image that makes use of an existing GL texture for data
 		* Note: Interop context is required!
@@ -57,9 +58,9 @@ namespace tcl {
 		* @param tex The GL texture we're using
 		*/
 #ifdef CL_VERSION_1_2
-		cl::ImageGL imageGL(MEM mem, GLuint tex);
+		cl::ImageGL imageGL(int mem, GLuint tex);
 #else
-		cl::Image2DGL imageGL(MEM mem, GLuint tex);
+		cl::Image2DGL imageGL(int mem, GLuint tex);
 #endif
 		/*
 		* Write some data to a buffer

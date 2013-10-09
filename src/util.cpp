@@ -110,6 +110,9 @@ void util::logCLError(std::ostream &os, const cl::Error &e, const std::string &m
 	os << "OpenCL Error! " << msg << " at: " << e.what() 
 		<< " error: # " << e.err() << " - " << clErrorString(e.err())
 		<< "\n";
+	//Could be a really bad error that could crash the driver if we don't abort
+	//such as continuing past CL_OUT_OF_RESOURCES, so exit
+	exit(e.err());
 }
 std::string util::clErrorString(int err){
 	switch (err){
