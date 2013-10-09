@@ -11,6 +11,7 @@
 #include "tinycl.h"
 #include "window.h"
 
+void runCGTests();
 //Test CG solve on the identity, just a sanity check
 void testCGSolveIdentity();
 //Test CG for how it'll be used in the simulation
@@ -30,10 +31,19 @@ void testFieldAdvect();
 void testVXFieldAdvect();
 //Test the y velocity field advection kernel
 void testVYFieldAdvect();
-//Test advection of an image using the velocity fields
-void testImgAdvect();
 
 int main(int argc, char **argv){
+	runCGTests();
+	SDL sdl(SDL_INIT_EVERYTHING);
+	Window win("Fluid!", 640, 480);
+	//16 is the dimensions of the textures we're loading
+	SimpleFluid fluidSim(16, win);
+	fluidSim.initSim();
+	fluidSim.runSim();
+
+    return 0;
+}
+void runCGTests(){
 	std::cout << "Using CG to solve an identity system\n";
 	testCGSolveIdentity();
 	std::cout << "Using CG to solve an example from wikipedia\n";
@@ -45,17 +55,6 @@ int main(int argc, char **argv){
 	std::cout << "Stress testing CG with multiple solves of a "
 		<< dim << "x" << dim << " system\n";
 	testCGStress(dim);
-	/*
-	//Try it out!
-	SDL sdl(SDL_INIT_EVERYTHING);
-	Window win("Fluid!", 640, 480);
-	//16 is the dimensions of the textures we're loading
-	SimpleFluid fluidSim(16, win);
-	fluidSim.initSim();
-	fluidSim.runSim();
-	*/
-
-    return 0;
 }
 void testCGSolveIdentity(){
 	tcl::Context context(tcl::DEVICE::GPU, false, false);
@@ -427,226 +426,4 @@ void testVYFieldAdvect(){
 		std::cout << std::setw(6) << std::setprecision(3) << vY[i] << " ";
 	}
 	std::cout << std::endl;
-}
-void testImgAdvect(){
-	SDL sdl(SDL_INIT_EVERYTHING);
-	const int winWidth = 640, winHeight = 480;
-	Window win("Image Advection Test", winWidth, winHeight);
-
-	//Maybe util::loadX should just throw an error
-	GLint progStatus = util::loadProgram("../res/quad_v.glsl", "../res/quad_f.glsl");
-	if (progStatus == -1){
-		return;
-	}
-	//In the program position is set to location 0, and uv is set to position 1
-	//Explicit uniform location is core in 4.3 so we still need to look up where the mvp is
-	GLuint program = progStatus;
-	GLint mvpUniform = glGetUniformLocation(program, "mvp");
-	GLint texUniform = glGetUniformLocation(program, "tex");
-
-	glm::mat4 model = glm::scale(1.5f, 1.5f, 1.f);
-	glm::vec3 camPos = glm::vec3(0.f, 0.f, -5.f);
-	glm::mat4 view = glm::lookAt(camPos, glm::vec3(0.f, 0.f, 0.f),
-		glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4 projection = glm::perspective(80.f, static_cast<float>(winWidth) / winHeight, 0.1f, 100.f);
-	glm::mat4 mvp = projection * view * model;
-	glUseProgram(program);
-	glUniformMatrix4fv(mvpUniform, 1, GL_FALSE, glm::value_ptr(mvp));
-
-	GLuint vao;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	GLuint quad[2];
-	glGenBuffers(2, quad);
-	glBindBuffer(GL_ARRAY_BUFFER, quad[0]);
-	glBufferData(GL_ARRAY_BUFFER, util::quadVerts.size() * sizeof(glm::vec3),
-		&util::quadVerts[0], GL_STATIC_DRAW);
-	
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad[1]);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, util::quadElems.size() * sizeof(GLushort),
-		&util::quadElems[0], GL_STATIC_DRAW);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(1);
-	size_t uvOffset = util::quadVerts.size() / 2 * sizeof(glm::vec3);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(uvOffset));
-
-	GLuint textures[2];
-	textures[0] = SOIL_load_OGL_texture("../res/img_diag.png", SOIL_LOAD_AUTO,
-		SOIL_CREATE_NEW_ID, SOIL_FLAG_INVERT_Y);
-	glBindTexture(GL_TEXTURE_2D, textures[0]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	glActiveTexture(GL_TEXTURE1);
-	textures[1] = SOIL_load_OGL_texture("../res/img_diag.png", SOIL_LOAD_AUTO,
-		SOIL_CREATE_NEW_ID, SOIL_FLAG_INVERT_Y);
-	glBindTexture(GL_TEXTURE_2D, textures[1]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	//The images are 16x16
-	size_t macDim = 16;
-
-	//Now setup our OpenCL context and buffers
-	tcl::Context context(tcl::DEVICE::GPU, true, false);
-#ifdef CL_VERSION_1_2
-	cl::ImageGL clImg[2];
-#else
-	cl::Image2DGL clImg[2];
-#endif
-	std::vector<cl::Memory> clglObjs;
-	for (int i = 0; i < 2; ++i){
-		clImg[i] = context.imageGL(tcl::MEM::READ_WRITE, textures[i]);
-		clglObjs.push_back(clImg[i]);
-	}
-	const float zero_vel[16 * 17] = { 0 };
-	cl::Buffer vXBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), zero_vel);
-	cl::Buffer vYBuf = context.buffer(tcl::MEM::READ_ONLY, macDim * (macDim + 1) * sizeof(float), zero_vel);
-	//If OpenCL 1.2 is available make use of
-	//cl::CommandQueue::enqueueFillBuffer(buffer, pattern, offset, size, events, event);
-	//where pattern would be 0.f
-	
-
-	float dt = 1.f / 20.f;
-	//Use to track which texture is storing the output of the advection
-	//and which is being used as input.
-	unsigned texIn = 0, texOut = 1;
-
-	cl::Program clProg = context.loadProgram("../res/simple_fluid.cl");
-	cl::Kernel advectImgField(clProg, "advect_img_field");
-	advectImgField.setArg(0, dt);
-	advectImgField.setArg(3, vXBuf);
-	advectImgField.setArg(4, vYBuf);
-
-	//Kernel and buffers for updating clicked pixels
-	cl::Kernel setPixel(clProg, "set_pixel");
-	//since the plane is square we can just use one range buffer
-	float planeRange[] = { -1.5f, 1.5f };
-	float brushColor[] = { 1.f, 1.f, 1.f, 1.f };
-	cl::Buffer brushColBuf = context.buffer(tcl::MEM::READ_ONLY, 4 * sizeof(float), brushColor);
-	setPixel.setArg(0, brushColBuf);
-
-	int gridDim[2] = { macDim, macDim };
-	cl::Kernel applyForce(clProg, "apply_force");
-	cl::Buffer clickForce = context.buffer(tcl::MEM::READ_ONLY, 2 * sizeof(float), nullptr);
-	cl::Buffer gridDimBuf = context.buffer(tcl::MEM::READ_ONLY, 2 * sizeof(int), gridDim);
-	applyForce.setArg(0, dt);
-	applyForce.setArg(1, clickForce);
-	applyForce.setArg(2, vXBuf);
-	applyForce.setArg(3, vYBuf);
-	applyForce.setArg(4, gridDimBuf);
-
-	util::logGLError(std::cerr, "About to enter loop, final error check");
-
-	//Track which run we're on, even or odd so we know which texture to read/write too
-	//and which to draw
-	bool quit = false;
-	while (!quit){
-		SDL_Event e;
-		while (SDL_PollEvent(&e)){
-			if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)){
-				quit = true;
-			}
-			//Select the brush color
-			if (e.type == SDL_KEYDOWN){
-				bool updateColor = false;
-				switch (e.key.keysym.sym){
-				case SDLK_1:
-					brushColor[0] = 1.f;
-					brushColor[1] = 0.f;
-					brushColor[2] = 0.f;
-					updateColor = true;
-					break;
-				case SDLK_2:
-					brushColor[0] = 0.f;
-					brushColor[1] = 1.f;
-					brushColor[2] = 0.f;
-					updateColor = true;
-					break;
-				case SDLK_3:
-					brushColor[0] = 0.f;
-					brushColor[1] = 0.f;
-					brushColor[2] = 1.f;
-					updateColor = true;
-					break;
-				case SDLK_4:
-					brushColor[0] = 1.f;
-					brushColor[1] = 1.f;
-					brushColor[2] = 1.f;
-					updateColor = true;
-					break;
-				default:
-					break;
-				}
-				if (updateColor){
-					context.writeData(brushColBuf, 3 * sizeof(float), brushColor);
-				}
-			}
-			//We want to be able to click on and interact with the fluid
-			//Later will switch to click & drag interaction but for now just draw dots on the grid
-			//For setting velocity we'll base the force on how much the mouse has moved
-			//This only seems to work if the mouse moved a bit or clicked, but if the mouse was just sitting
-			//and the button held down it doesn't say the button is down. same for SDL_GetMouseState
-			int mouseDelta[2];
-			if (SDL_GetRelativeMouseState(&mouseDelta[0], &mouseDelta[1]) & SDL_BUTTON(1)){
-				//The coordinate system being used in the simulation is inverted
-				float force[] = { -mouseDelta[0], -mouseDelta[1] };
-				context.writeData(clickForce, 2 * sizeof(float), force);
-
-				glm::vec4 ray((2.f * e.button.x) / winWidth - 1, 1 - (2.f * e.button.y) / winHeight, -1.f, 0.f);
-				ray = glm::inverse(projection) * ray;
-				ray.z = -1.f;
-				ray.w = 0.f;
-				ray = glm::normalize(glm::inverse(view) * ray);
-
-				//Now intersect with a plane. Later put this in a function and make a ray struct
-				//The plane normal is facing towards the camera
-				float ndotr = glm::dot(ray, glm::vec4(0, 0, 1, 0));
-				float t = (glm::dot(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1)) - glm::dot(camPos, glm::vec3(0, 0, 1))) / ndotr;
-				glm::vec3 hit = camPos + glm::vec3(ray) * t;
-				//The plane is from -1.5 to 1.5 in x & y
-				if (std::abs(hit.x) < 1.5 && std::abs(hit.y) < 1.5){
-					//Start the apply force kernel
-					int pxPos[] = {
-						((hit.x - planeRange[0]) / (planeRange[1] - planeRange[0])) * macDim,
-						((hit.y - planeRange[0]) / (planeRange[1] - planeRange[0])) * macDim
-					};
-					context.runNDKernel(applyForce, cl::NDRange(1, 1), cl::NullRange, cl::NDRange(pxPos[0], pxPos[1]), false);
-
-
-					setPixel.setArg(1, clImg[texIn]);
-					setPixel.setArg(2, clImg[texIn]);
-					//Run the kernel to update the hit pixel and the velocity at the pixel
-					glFinish();
-					context.mQueue.enqueueAcquireGLObjects(&clglObjs);
-					context.runNDKernel(setPixel, cl::NDRange(1, 1), cl::NullRange, cl::NDRange(pxPos[0], pxPos[1]), false);
-					context.mQueue.enqueueReleaseGLObjects(&clglObjs);
-					context.mQueue.finish();
-				}
-			}
-		}
-		glFinish();
-		advectImgField.setArg(1, clImg[texIn]);
-		advectImgField.setArg(2, clImg[texOut]);
-		context.mQueue.enqueueAcquireGLObjects(&clglObjs);
-		context.runNDKernel(advectImgField, cl::NDRange(macDim, macDim), cl::NullRange, cl::NullRange, false);
-		context.mQueue.enqueueReleaseGLObjects(&clglObjs);
-		context.mQueue.finish();
-
-		glUniform1i(texUniform, texOut);
-		win.clear();
-		glDrawElements(GL_TRIANGLES, util::quadElems.size(), GL_UNSIGNED_SHORT, 0);
-		win.present();
-
-		SDL_Delay(30);
-		std::swap(texIn, texOut);
-	}
-	
-	glDeleteTextures(2, textures);
-	glDeleteVertexArrays(1, &vao);
-	glDeleteBuffers(2, quad);
-	glDeleteProgram(program);
 }

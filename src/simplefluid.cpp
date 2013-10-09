@@ -269,11 +269,11 @@ void SimpleFluid::stepSim(float dt){
 	context.mQueue.enqueueReleaseGLObjects(&clglObjs);
 
 	//Project
-	//TODO: There is some kinda bug in the solver or somewhere in here
-	//context.runNDKernel(velocity_divergence, cl::NDRange(dim, dim), cl::NullRange, cl::NullRange);
-	//cgSolver.solve();
-	//context.runNDKernel(subtract_pressure_x, cl::NDRange(dim + 1, dim), cl::NullRange, cl::NullRange);
-	//context.runNDKernel(subtract_pressure_y, cl::NDRange(dim, dim + 1), cl::NullRange, cl::NullRange);
+	//Some unitialized values are making their way into the solver or something, keep getting 1.#QNAN
+	context.runNDKernel(velocity_divergence, cl::NDRange(dim, dim), cl::NullRange, cl::NullRange);
+	cgSolver.solve();
+	context.runNDKernel(subtract_pressure_x, cl::NDRange(dim + 1, dim), cl::NullRange, cl::NullRange);
+	context.runNDKernel(subtract_pressure_y, cl::NDRange(dim, dim + 1), cl::NullRange, cl::NullRange);
 }
 void SimpleFluid::clickFluid(){
 	//Must call GetRelativeMouseState each frame to update the mouse deltas
