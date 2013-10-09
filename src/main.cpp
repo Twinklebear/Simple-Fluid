@@ -33,7 +33,8 @@ void testVXFieldAdvect();
 void testVYFieldAdvect();
 
 int main(int argc, char **argv){
-	runCGTests();
+	testCGStress(16);
+
 	SDL sdl(SDL_INIT_EVERYTHING);
 	Window win("Fluid!", 640, 480);
 	//16 is the dimensions of the textures we're loading
