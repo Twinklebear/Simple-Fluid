@@ -4,127 +4,163 @@
 #include "sparsematrix.h"
 #include "cgsolver.h"
 
+//Helper for debugging, print an array's values
+void printArray(float *arr, int n){
+	for (int i = 0; i < n; ++i){
+		std::cout << arr[i] << ", ";
+	}
+	std::cout << "\n";
+}
+
 CGSolver::CGSolver(const SparseMatrix<float> &mat, const std::vector<float> &b, 
-	tcl::Context &context, int iter, float len)
-		: context(context), maxIterations(iter), dimensions(mat.dim), matElems(mat.elements.size()), convergeLength(len)
+	tcl::Context &context, int iter, float convergeLen)
+		: context(context), maxIterations(iter), dimensions(mat.dim), convergeLen(convergeLen),
+		matNVals(mat.elements.size())
 {
 	loadKernels();
 	createBuffers(mat, b);
+	initKernelArgs();
 }
 void CGSolver::solve(){
 	initSolve();
 
-	float rLen = 100;
-	int i = 0;
-	for (i = 0; i < maxIterations && rLen >= convergeLength; ++i){
-		//Compute Ap
-		context.runNDKernel(matVecMult, cl::NDRange(dimensions), cl::NullRange, cl::NullRange, false);
-		//Compute p dot Ap
-		dot.setArg(0, aMultp);
-		dot.setArg(1, p);
-		dot.setArg(2, apDotp);
-		context.runNDKernel(dot, cl::NDRange(dimensions / 2), cl::NullRange, cl::NullRange, false);
-		context.runNDKernel(updateAlpha, cl::NDRange(1), cl::NullRange, cl::NullRange, false);
-		context.runNDKernel(updateXR, cl::NDRange(dimensions), cl::NullRange, cl::NullRange, false);
-			
-		//Find new r dot r
-		dot.setArg(0, r);
-		dot.setArg(1, r);
-		dot.setArg(2, rDotr[1]);
-		context.runNDKernel(dot, cl::NDRange(dimensions / 2), cl::NullRange, cl::NullRange, false);
-		context.runNDKernel(updateDir, cl::NDRange(dimensions), cl::NullRange, cl::NullRange, false);
+	//Compute initial r_dot_r_0
+	big_dot.setArg(0, r);
+	big_dot.setArg(1, r);
+	context.runNDKernel(big_dot, cl::NDRange(dimensions), cl::NullRange, cl::NullRange);
+	context.runNDKernel(sum_partial, cl::NDRange(1), cl::NullRange, cl::NullRange);
+	context.mQueue.enqueueCopyBuffer(dotPartial, rDotr, 0, 0, sizeof(float));
 
-		//Update old r dot r and find rLen
-		context.mQueue.enqueueCopyBuffer(rDotr[1], rDotr[0], 0, 0, sizeof(float));
-		context.readData(rDotr[1], sizeof(float), &rLen, 0, true);
-		rLen = std::sqrtf(rLen);
+	float rLen = 1000.f;
+	int i = 0;
+	for (i = 0; i < maxIterations && rLen > convergeLen; ++i){
+		//find matP = Ap
+		context.runNDKernel(sparse_mat_vec_mult, cl::NDRange(dimensions), cl::NullRange, cl::NullRange);
+
+		//find pMatp = p dot Ap
+		big_dot.setArg(0, p);
+		big_dot.setArg(1, matP);
+		context.runNDKernel(big_dot, cl::NDRange(dimensions), cl::NullRange, cl::NullRange);
+		context.runNDKernel(sum_partial, cl::NDRange(1), cl::NullRange, cl::NullRange);
+		context.mQueue.enqueueCopyBuffer(dotPartial, pMatp, 0, 0, sizeof(float));
+
+		//find x_k+1 and r_k+1
+		context.runNDKernel(update_xr, cl::NDRange(dimensions), cl::NullRange, cl::NullRange);
+
+		//find r_dot_r_k+1
+		big_dot.setArg(0, r);
+		big_dot.setArg(1, r);
+		context.runNDKernel(big_dot, cl::NDRange(dimensions), cl::NullRange, cl::NullRange);
+		context.runNDKernel(sum_partial, cl::NDRange(1), cl::NullRange, cl::NullRange);
+		context.mQueue.enqueueCopyBuffer(dotPartial, rDotr, 0, sizeof(float), sizeof(float));
+
+		//find matP = Ap
+		context.runNDKernel(sparse_mat_vec_mult, cl::NDRange(dimensions), cl::NullRange, cl::NullRange);
+
+		//find p_k+1
+		context.runNDKernel(update_p, cl::NDRange(dimensions), cl::NullRange, cl::NullRange);
+
+		//copy r_dot_r_k+1 over to r_dot_r_k for next step
+		context.mQueue.enqueueCopyBuffer(rDotr, rDotr, sizeof(float), 0, sizeof(float));
+
+		//Read back residual length
+		context.readData(rDotr, sizeof(float), &rLen, sizeof(float), true);
+		rLen = std::sqrt(rLen);
 	}
 	std::cout << "solution took: " << i << " iterations, final residual length: " << rLen << std::endl;
 }
-void CGSolver::updateB(const std::vector<float> &b){
-	bVec = context.buffer(tcl::MEM::READ_ONLY, dimensions * sizeof(float), &b[0]);
+void CGSolver::updateB(const std::vector<float> &bVec){
+	b = context.buffer(tcl::MEM::READ_ONLY, dimensions * sizeof(float), &bVec[0]);
 }
-void CGSolver::updateB(cl::Buffer &b){
-	bVec = b;
+void CGSolver::updateB(cl::Buffer &bBuf){
+	b = bBuf;
 }
 std::vector<float> CGSolver::getResult(){
 	std::vector<float> res;
 	res.resize(dimensions);
-	context.readData(result, dimensions * sizeof(float), &res[0], 0, true);
+	float *xBuf = static_cast<float*>(context.mQueue.enqueueMapBuffer(x, CL_TRUE, CL_MAP_READ, 0, dimensions * sizeof(float)));
+	std::memcpy(&res[0], xBuf, dimensions * sizeof(float));
+	context.mQueue.enqueueUnmapMemObject(x, xBuf);
 	return res;
 }
 cl::Buffer CGSolver::getResultBuffer(){
-	return result;
+	return x;
 }
 void CGSolver::loadKernels(){
-	program = context.loadProgram("../res/cg_solver.cl");
-	initVects = cl::Kernel(program, "init_vects");
-	matVecMult = cl::Kernel(program, "mat_vec_mult");
-	dot = cl::Kernel(program, "big_dot");
-	updateXR = cl::Kernel(program, "update_xr");
-	updateDir = cl::Kernel(program, "update_dir");
-	updateAlpha = cl::Kernel(program, "update_alpha");
+	cgProgram = context.loadProgram("../res/cg_kernels.cl");
+	sparse_mat_vec_mult = cl::Kernel(cgProgram, "sparse_mat_vec_mult");
+	big_dot = cl::Kernel(cgProgram, "big_dot");
+	sum_partial = cl::Kernel(cgProgram, "sum_partial");
+	update_xr = cl::Kernel(cgProgram, "update_xr");
+	update_p = cl::Kernel(cgProgram, "update_p");
 }
-void CGSolver::createBuffers(const SparseMatrix<float> &mat, const std::vector<float> &b){
-	std::vector<int> rows, cols;
-	std::vector<float> vals;
-	rows.resize(mat.elements.size());
-	cols.resize(mat.elements.size());
-	vals.resize(mat.elements.size());
-	mat.getRaw(&rows[0], &cols[0], &vals[0]);
+void CGSolver::createBuffers(const SparseMatrix<float> &mat, const std::vector<float> &bVec){
+	matrix[MATRIX::ROW] = context.buffer(CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
+		matNVals * sizeof(int), nullptr);
+	matrix[MATRIX::COL] = context.buffer(CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
+		matNVals * sizeof(int), nullptr);
+	matrix[MATRIX::VAL] = context.buffer(CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
+		matNVals * sizeof(float), nullptr);
+	//Map the buffers and write the matrix over
+	int *rows = static_cast<int*>(context.mQueue.enqueueMapBuffer(matrix[MATRIX::ROW], CL_FALSE,
+		CL_MAP_WRITE, 0, matNVals * sizeof(int)));
+	int *cols = static_cast<int*>(context.mQueue.enqueueMapBuffer(matrix[MATRIX::COL], CL_FALSE,
+		CL_MAP_WRITE, 0, matNVals * sizeof(int)));
+	//Block on the final map so that we can now start writing
+	float *vals = static_cast<float*>(context.mQueue.enqueueMapBuffer(matrix[MATRIX::VAL], CL_TRUE,
+		CL_MAP_WRITE, 0, matNVals * sizeof(float)));
 
-	matrix[MATRIX::ROW] = context.buffer(tcl::MEM::READ_ONLY, rows.size() * sizeof(int), &rows[0]);
-	matrix[MATRIX::COL] = context.buffer(tcl::MEM::READ_ONLY, cols.size() * sizeof(int), &cols[0]);
-	matrix[MATRIX::VAL] = context.buffer(tcl::MEM::READ_ONLY, vals.size() * sizeof(float), &vals[0]);
+	mat.getRaw(rows, cols, vals);
+	
+	context.mQueue.enqueueUnmapMemObject(matrix[MATRIX::ROW], rows);
+	context.mQueue.enqueueUnmapMemObject(matrix[MATRIX::COL], cols);
+	context.mQueue.enqueueUnmapMemObject(matrix[MATRIX::VAL], vals);
 
 	//In the case that we want to upload everything but the b vector
-	if (!b.empty()){
-		bVec = context.buffer(tcl::MEM::READ_ONLY, dimensions * sizeof(float), &b[0]);
+	if (!bVec.empty()){
+		b = context.buffer(CL_MEM_READ_ONLY, dimensions * sizeof(float), &bVec[0]);
 	}
-	result = context.buffer(tcl::MEM::READ_WRITE, dimensions * sizeof(float), nullptr);
+	x = context.buffer(CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, dimensions * sizeof(float), nullptr);
+	r = context.buffer(CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, dimensions * sizeof(float), nullptr);
+	p = context.buffer(CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, dimensions * sizeof(float), nullptr);
 
-	//Setup the other buffers we'll need for the computation
-	r = context.buffer(tcl::MEM::READ_WRITE, dimensions * sizeof(float), nullptr);
-	p = context.buffer(tcl::MEM::READ_WRITE, dimensions * sizeof(float), nullptr);
-	aMultp = context.buffer(tcl::MEM::READ_WRITE, dimensions * sizeof(float), nullptr);
-	apDotp = context.buffer(tcl::MEM::READ_WRITE, dimensions * sizeof(float), nullptr);
-	alpha = context.buffer(tcl::MEM::READ_WRITE, sizeof(float), nullptr);
-	for (int i = 0; i < 2; ++i){
-		rDotr[i] = context.buffer(tcl::MEM::READ_WRITE, dimensions * sizeof(float), nullptr);
+	matP = context.buffer(CL_MEM_READ_WRITE, dimensions * sizeof(float), nullptr);
+	pMatp = context.buffer(CL_MEM_READ_WRITE, dimensions * sizeof(float), nullptr);
+	rDotr = context.buffer(CL_MEM_READ_WRITE, 2 * sizeof(float), nullptr);
+	dotPartial = context.buffer(CL_MEM_READ_WRITE, dimensions * sizeof(float), nullptr);
+}
+void CGSolver::initKernelArgs(){
+	sparse_mat_vec_mult.setArg(0, matNVals);
+	for (int i = 0; i < 3; ++i){
+		sparse_mat_vec_mult.setArg(i + 1, matrix[i]);
 	}
+	sparse_mat_vec_mult.setArg(4, p);
+	sparse_mat_vec_mult.setArg(5, matP);
+
+	big_dot.setArg(2, dotPartial);
+	sum_partial.setArg(0, dotPartial);
+	sum_partial.setArg(1, dimensions);
+
+	update_xr.setArg(0, rDotr);
+	update_xr.setArg(1, pMatp);
+	update_xr.setArg(2, p);
+	update_xr.setArg(3, matP);
+	update_xr.setArg(4, x);
+	update_xr.setArg(5, r);
+
+	update_p.setArg(0, rDotr);
+	update_p.setArg(1, r);
+	update_p.setArg(2, p);
 }
 void CGSolver::initSolve(){
-	initVects.setArg(0, result);
-	initVects.setArg(1, r);
-	initVects.setArg(2, p);
-	initVects.setArg(3, bVec);
-	//We can run the intialization kernel while we setup more stuff, so start it now
-	context.runNDKernel(initVects, cl::NDRange(dimensions), cl::NullRange, cl::NullRange, false);
-	//We can do the same thing for finding the initial r dot r buffer
-	dot.setArg(0, r);
-	dot.setArg(1, r);
-	dot.setArg(2, rDotr[0]);
-	context.runNDKernel(dot, cl::NDRange(dimensions / 2), cl::NullRange, cl::NullRange, false);
-
-	matVecMult.setArg(0, sizeof(int), &matElems);
-	matVecMult.setArg(1, matrix[MATRIX::ROW]);
-	matVecMult.setArg(2, matrix[MATRIX::COL]);
-	matVecMult.setArg(3, matrix[MATRIX::VAL]);
-	matVecMult.setArg(4, p);
-	matVecMult.setArg(5, aMultp);
-
-	updateXR.setArg(0, alpha);
-	updateXR.setArg(1, p);
-	updateXR.setArg(2, aMultp);
-	updateXR.setArg(3, result);
-	updateXR.setArg(4, r);
-
-	updateDir.setArg(0, rDotr[1]);
-	updateDir.setArg(1, rDotr[0]);
-	updateDir.setArg(2, r);
-	updateDir.setArg(3, p);
-
-	updateAlpha.setArg(0, rDotr[0]);
-	updateAlpha.setArg(1, apDotp);
-	updateAlpha.setArg(2, alpha);
+	context.mQueue.enqueueCopyBuffer(b, r, 0, 0, dimensions * sizeof(float));
+	context.mQueue.enqueueCopyBuffer(b, p, 0, 0, dimensions * sizeof(float));
+#ifdef CL_VERSION_1_2
+	//Use FillBuffer to fill X with 0's but not have to transfer between host/device
+	//cl::CommandQueue::enqueueFillBuffer(buffer, pattern, offset, size, events, event);
+#else
+	float *xBuf = static_cast<float*>(context.mQueue.enqueueMapBuffer(x, CL_TRUE, CL_MAP_WRITE, 0, dimensions * sizeof(float)));
+	std::memset(xBuf, 0, dimensions * sizeof(float));
+	context.mQueue.enqueueUnmapMemObject(x, xBuf);
+#endif
 }
